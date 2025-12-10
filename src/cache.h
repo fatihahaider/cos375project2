@@ -33,7 +33,7 @@ private:
     };
 
     uint64_t hits = 0; 
-    misses = 0;
+    uint64_t misses = 0;
     CacheDataType type;
 
     // LRU bookkeeping
