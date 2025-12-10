@@ -13,9 +13,10 @@ std::uniform_real_distribution<double> distribution(0.0, 1.0); */
 // Constructor definition
 Cache::Cache(CacheConfig configParam, CacheDataType cacheType) : hits(0), misses(0), 
 type(cacheType), numSets(0), blockOffsetBits(0), indexBits(0), 
-sets(), 
 globalCounter(0),
-config(configParam) {
+sets(),
+config(configParam)
+{
     // Here you can initialize other cache-specific attributes
     // For instance, if you had cache tables or other structures, initialize them here
 
