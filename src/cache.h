@@ -32,7 +32,7 @@ private:
         uint64_t lruCounter = 0;  // for true LRU
     };
 
-    uint64_t hits = 0 
+    uint64_t hits = 0; 
     misses = 0;
     CacheDataType type;
 
