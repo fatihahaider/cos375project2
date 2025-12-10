@@ -26,8 +26,30 @@ enum CacheOperation { CACHE_READ = false, CACHE_WRITE = true };
 
 class Cache {
 private:
-    uint64_t hits, misses;    
+    struct Line {
+        bool valid = false;
+        uint64_t tag = 0;
+        uint64_t lruCounter = 0;  // for true LRU
+    };
+
+    uint64_t hits = 0 
+    misses = 0;
     CacheDataType type;
+
+    // LRU bookkeeping
+    uint64_t numSets = 0;
+    uint64_t blockOffsetBits = 0;
+    uint64_t indexBits = 0;
+    uint64_t globalCounter = 0; // global “time” to implement LRU
+
+    std::vector<std::vector<Line>> sets; // [set][way]
+
+     // helper to compute log2 when argument is power of 2
+    uint64_t log2Pow2(uint64_t x) {
+        uint64_t b = 0;
+        while ((1ULL << b) < x) ++b;
+        return b;
+    }
 
 public:
     CacheConfig config;
@@ -37,16 +59,15 @@ public:
     /** Access methods for reading/writing
      * @return true for hit and false for miss
      * @param
-     *      address: memory address
-     *      readWrite: true for read operation and false for write operation
+     *  address: memory address
+     *  readWrite: true for write operation and false for read operation
      */
     bool access(uint64_t address, CacheOperation readWrite);
 
     // debug: dump information as you needed
     Status dump(const std::string& base_output_name);
 
-    // TODO: You may add more methods and fields as needed
-
-    uint64_t getHits() { return hits; }
+    uint64_t getHits()   { return hits; }
     uint64_t getMisses() { return misses; }
 };
+

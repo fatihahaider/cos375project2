@@ -16,19 +16,6 @@ static uint64_t cycleCount = 0;
 
 static uint64_t PC = 0; // start PC
 
-Simulator::Instruction IF_ID;
-Simulator::Instruction ID_EX;
-Simulator::Instruction EX_MEM;
-Simulator::Instruction MEM_WB;
-
-// For next cycle values:
-Simulator::Instruction next_IF_ID;
-Simulator::Instruction next_ID_EX;
-Simulator::Instruction next_EX_MEM;
-Simulator::Instruction next_MEM_WB;
-
-bool done = false;   // halt when WB sees HALT
-
 // stall & stats
 static int loadBranchStallCycles = 0;   // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0;     // total load-related stall cycles
