@@ -191,15 +191,15 @@ Status runCycles(uint64_t cycles) {
         bool exceptionFromID  = false;
         bool exceptionFromMEM = false;
 
-    // If we raised an exception last cycle, redirect PC now
-    if (exceptionPending) {
+        // If we raised an exception last cycle, redirect PC now
+        if (exceptionPending) {
         PC = EXCEPTION_HANDLER_ADDR;
         exceptionPending = false;
 
         // Start fresh in IF/ID; older instructions in EX/MEM/WB will drain
         pipelineInfo.ifInst = nop(IDLE);
         pipelineInfo.idInst = nop(IDLE);
-    }
+        }
 
         // Snapshot previous pipeline state at start of cycle
         PipelineInfo prev = pipelineInfo;
@@ -250,18 +250,21 @@ Status runCycles(uint64_t cycles) {
             stallIF = stallID = true;
             bubbleEX = true;
             loadBranchStallCycles--;
-            loadStallCount++;
+            // loadStallCount++; not to be incremented because it is the same event?
+
         } else if (loadBranchHazard) {
             // start a 2-cycle load->branch stall
             stallIF = stallID = true;
             bubbleEX = true;
             loadBranchStallCycles = 1; // this cycle + next
             loadStallCount++;
+
         } else if (loadUseHazard) {
             // 1-cycle load-use stall
             stallIF = stallID = true;
             bubbleEX = true;
             loadStallCount++;
+
         } else if (arithBranchHazard) {
             // 1-cycle arithmetic->branch stall
             stallIF = stallID = true;
@@ -365,6 +368,39 @@ Status runCycles(uint64_t cycles) {
         // will finally move on to ID.
             }
         }
+
+        // === 7. Handle exceptions: squash and arm trap ===
+        if (exceptionFromID || exceptionFromMEM) {
+            // We will start fetching from handler next cycle
+            exceptionPending = true;
+
+            if (exceptionFromMEM) {
+                // Excepting instruction is in MEM.
+                // Older instructions (WB) may still complete.
+                // Younger instructions EX/ID/IF must be squashed.
+                pipelineInfo.exInst = nop(BUBBLE);
+                pipelineInfo.idInst = nop(BUBBLE);
+                pipelineInfo.ifInst = nop(BUBBLE);
+
+        // Also make sure the MEM instruction itself does not propagate as a "normal" instruction.
+        // It already has memException=true; simWB will ignore it.
+        // You can optionally mark it as NOP for clarity:
+        // pipelineInfo.memInst.isNop = true;
+            }
+
+            if (exceptionFromID) {
+                // Excepting instruction detected in ID.
+                // Older ones in EX/MEM/WB drain.
+                // The illegal instruction itself must not reach EX/WB.
+                // Squash it and any younger IF instruction.
+                pipelineInfo.idInst = nop(BUBBLE);
+                pipelineInfo.ifInst = nop(BUBBLE);
+            }
+
+            // Note: we *don't* touch PC here; PC redirect happens at the
+            // top of the *next* cycle when exceptionPending is true.
+            }
+
     }
 
     // Dump pipe state for the last cycle executed in this call
@@ -411,7 +447,7 @@ Status finalizeSimulator() {
         icMisses,
         dcHits,
         dcMisses,
-        loadStallCount        // you already count this in runCycles
+        loadStallCount        // load stalls (events not cycles)
     };
 
     dumpSimStats(stats, output);
