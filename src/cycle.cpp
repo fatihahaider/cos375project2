@@ -20,18 +20,19 @@ static uint64_t PC = 0; // start PC
 static int loadBranchStallCycles = 0;   // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0;     // total load-related stall cycles
 
-// add when cache implementation is done
-static uint64_t iCacheHits   = 0;
-static uint64_t iCacheMisses = 0;
-static uint64_t dCacheHits   = 0;
-static uint64_t dCacheMisses = 0;
+// cache miss timing
+static int iMissCyclesLeft = 0;  // remaining extra cycles for current I-cache miss
+static int dMissCyclesLeft = 0;  // remaining extra cycles for current D-cache miss
+
+static const uint64_t EXCEPTION_HANDLER_ADDR = 0x8000;
+
+static bool exceptionPending = false;      // "next cycle, start at handler"
 
 
 
 /**TODO: Implement pipeline simulation for the RISCV machine in this file.
  * A basic template is provided below that doesn't account for any hazards.
  */
-
 
 Simulator::Instruction nop(StageStatus status) {
     Simulator::Instruction nop;
@@ -187,13 +188,30 @@ Status runCycles(uint64_t cycles) {
         pipeState.cycle = cycleCount;
         count++;
         cycleCount++;
+        bool exceptionFromID  = false;
+        bool exceptionFromMEM = false;
+
+    // If we raised an exception last cycle, redirect PC now
+    if (exceptionPending) {
+        PC = EXCEPTION_HANDLER_ADDR;
+        exceptionPending = false;
+
+        // Start fresh in IF/ID; older instructions in EX/MEM/WB will drain
+        pipelineInfo.ifInst = nop(IDLE);
+        pipelineInfo.idInst = nop(IDLE);
+    }
 
         // Snapshot previous pipeline state at start of cycle
         PipelineInfo prev = pipelineInfo;
 
         // === 1. WB stage ===
-        pipelineInfo.wbInst = nop(BUBBLE);              // default bubble
-        pipelineInfo.wbInst = simulator->simWB(prev.memInst);
+        if (dMissCyclesLeft > 0) {
+            // The memory instruction hasn't finished its miss yet,
+         // so nothing can commit this cycle.
+            pipelineInfo.wbInst = nop(BUBBLE);
+        } else {
+         pipelineInfo.wbInst = simulator->simWB(prev.memInst);
+        }
 
         // WB: halt check (HALT only when it reaches WB)
         if (pipelineInfo.wbInst.isHalt) {
@@ -209,6 +227,16 @@ Status runCycles(uint64_t cycles) {
         bool loadUseHazard     = hasLoadUseHazard(prev.exInst, prev.idInst);
         bool arithBranchHazard = hasArithBranchHazard(prev.exInst, prev.idInst);
         bool loadBranchHazard  = hasLoadBranchHazard(prev.exInst, prev.idInst);
+
+        // === 2.5 D-cache miss: stall IF/ID/EX while miss in MEM ===
+        bool dMissActive = (dMissCyclesLeft > 0);
+        if (dMissActive) {
+            // Current MEM instruction is waiting on a D-cache miss.
+            // Younger instructions must stall; EX should hold its current instruction
+            // (so do NOT bubble it because of the miss).
+            stallIF = true;
+            stallID = true;
+        }
 
         // Special case: load->store (using rd only as rs2) should NOT stall
         if (loadUseHazard && isStore(prev.idInst) &&
@@ -240,18 +268,55 @@ Status runCycles(uint64_t cycles) {
             bubbleEX = true;
         }
 
-        // === 3. MEM stage (with load->store forwarding) ===
-        Simulator::Instruction memInput = prev.exInst;
-        // forward from WB (load result) into store data if needed
-        forwardLoadToStore(memInput, pipelineInfo.wbInst);
-        pipelineInfo.memInst = simulator->simMEM(memInput);
+        // === 3. MEM stage (with D-cache timing + load->store forwarding) ===
+        if (dMissCyclesLeft > 0) {
+            // In the middle of a D-cache miss: keep the same instruction in MEM
+            pipelineInfo.memInst = prev.memInst;
+            dMissCyclesLeft--;
+            // No new memory access; the outstanding miss is still in flight.
+        } else {
+            // Potentially new memory access coming from EX
+            Simulator::Instruction memInput = prev.exInst;
+            // forward from WB (load result) into store data if needed
+            forwardLoadToStore(memInput, pipelineInfo.wbInst);
+
+            if (memInput.readsMem || memInput.writesMem) {
+                bool hit = dCache->access(
+                    memInput.memAddress,
+                    memInput.readsMem ? CACHE_READ : CACHE_WRITE
+             );
+
+                if (hit) {
+                    // Hit: MEM completes this cycle
+                    pipelineInfo.memInst = simulator->simMEM(memInput);
+                } else {
+                    // Miss: this instruction enters MEM now, and then stays
+                    // for config.missLatency extra cycles.
+                    pipelineInfo.memInst = simulator->simMEM(memInput);
+                    dMissCyclesLeft = static_cast<int>(dCache->config.missLatency);
+                }
+            } else {
+                // Non-memory instruction: just pass through MEM
+                pipelineInfo.memInst = simulator->simMEM(memInput);
+            }
+        }
+
+        // After MEM: detect memory exception (bad address)
+        if (pipelineInfo.memInst.memException) {
+            exceptionFromMEM = true;
+        }
+
 
         // === 4. EX stage ===
-        if (bubbleEX) {
+        if (dMissCyclesLeft > 0) {
+            // While a D-miss is active, EX must stall (hold its current instruction)
+            pipelineInfo.exInst = prev.exInst;
+        } else if (bubbleEX) {
             pipelineInfo.exInst = nop(BUBBLE);
         } else {
             pipelineInfo.exInst = simulator->simEX(prev.idInst);
         }
+
 
         // === 5. ID stage ===
         if (stallID) {
@@ -267,15 +332,38 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.memInst,
                     pipelineInfo.wbInst);
 
-        // === 6. IF stage ===
+        // Detect illegal instruction exception in ID
+        if (!pipelineInfo.idInst.isNop &&
+            !pipelineInfo.idInst.isHalt &&
+         !pipelineInfo.idInst.isLegal) {
+         exceptionFromID = true;
+        }
+
+        // === 6. IF stage (with I-cache timing) ===
         if (stallIF) {
-            // hold current IF instruction, don't change PC
+            // Stalled by data hazard or D-cache miss: hold IF, don't touch PC or I-cache
             pipelineInfo.ifInst = prev.ifInst;
+        } else if (iMissCyclesLeft > 0) {
+            // In the middle of an I-cache miss: keep the same instruction in IF
+            pipelineInfo.ifInst = prev.ifInst;
+            iMissCyclesLeft--;
+        // PC does NOT advance while waiting for this miss to resolve
         } else {
-            // For now: always-not-taken & PC+4.
-            // Later roadmap step: use inst.nextPC and squash on taken branch.
+            // New fetch opportunity: access I-cache
+            bool hit = iCache->access(PC, CACHE_READ);
+
+            if (hit) {
+            // Hit: normal fetch, completes in IF this cycle
             pipelineInfo.ifInst = simulator->simIF(PC);
-            PC += 4;
+            PC += 4;  // always-not-taken for now; branch logic later
+            } else {
+            // Miss: instruction appears in IF this cycle, then stays here
+            // for config.missLatency extra cycles.
+            pipelineInfo.ifInst = simulator->simIF(PC);
+            iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
+        // DO NOT advance PC; after the miss completes, this instruction
+        // will finally move on to ID.
+            }
         }
     }
 
@@ -311,16 +399,22 @@ Status runTillHalt() {
 Status finalizeSimulator() {
     simulator->dumpRegMem(output);
 
+    uint64_t icHits   = iCache ? iCache->getHits()   : 0;
+    uint64_t icMisses = iCache ? iCache->getMisses() : 0;
+    uint64_t dcHits   = dCache ? dCache->getHits()   : 0;
+    uint64_t dcMisses = dCache ? dCache->getMisses() : 0;
+
     SimulationStats stats{
         simulator->getDin(),  // dynamic instructions
         cycleCount,           // total cycles
-        iCacheHits,           // icHits  (still 0 until caches wired)
-        iCacheMisses,         // icMisses
-        dCacheHits,           // dcHits
-        dCacheMisses,         // dcMisses
-        loadStallCount        // load stalls (load-use + load-branch)
+        icHits,
+        icMisses,
+        dcHits,
+        dcMisses,
+        loadStallCount        // you already count this in runCycles
     };
 
     dumpSimStats(stats, output);
     return SUCCESS;
 }
+
