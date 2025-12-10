@@ -435,23 +435,67 @@ Simulator::Instruction Simulator::simCommit(Instruction inst, REGS &regData) {
 // You may find it useful to call functional simulation functions above
 
 Simulator::Instruction Simulator::simIF(uint64_t PC) {
-    throw std::runtime_error("simIF not implemented yet"); // TODO implement IF 
+    Instruction inst = simFetch(PC, memory);
+    inst.status = FETCHED;
+    return inst; // TODO implement IF 
 }
 
 Simulator::Instruction Simulator::simID(Simulator::Instruction inst) {
-    throw std::runtime_error("simID not implemented yet"); // TODO implement ID
+    if (inst.isNop || inst.isHalt) return inst;
+
+    inst = simDecode(inst);
+
+    // illegal instruction handling: mark now, handled in cycle.cpp later
+    if (!inst.isLegal) {
+        return inst;  
+    }
+
+    inst = simOperandCollection(inst, regData);
+    inst = simNextPCResolution(inst);
+
+    inst.status = DECODED;
+    return inst; // TODO implement ID
 }
 
 Simulator::Instruction Simulator::simEX(Simulator::Instruction inst) {
-    throw std::runtime_error("simEX not implemented yet"); // TODO implement EX
+    if (inst.isNop || inst.isHalt || !inst.isLegal) return inst;
+
+    // arithmetic instructions
+    if (inst.doesArithLogic) {
+        inst = simArithLogic(inst);
+    }
+
+    // load/store address generation
+    if (inst.readsMem || inst.writesMem) {
+        inst = simAddrGen(inst);
+    }
+
+    inst.status = EXECUTED;
+    return inst; // TODO implement EX
 }
 
 Simulator::Instruction Simulator::simMEM(Simulator::Instruction inst) {
-    throw std::runtime_error("simMEM not implemented yet"); // TODO implement MEM
-}
+    if (inst.isNop || inst.isHalt || !inst.isLegal) return inst;
+
+    // actual memory access
+    if (inst.readsMem || inst.writesMem) {
+        inst = simMemAccess(inst, memory);
+    }
+
+    inst.status = MEMACC;
+    return inst;
+} // TODO implement MEM
+
 
 Simulator::Instruction Simulator::simWB(Simulator::Instruction inst) {
-    throw std::runtime_error("simWB not implemented yet"); // TODO implement WB
+    if (inst.isNop || inst.isHalt || !inst.isLegal) return inst;
+
+    if (inst.writesRd) {
+        inst = simCommit(inst, regData);
+    }
+
+    inst.status = WRITTEN;
+    return inst; // TODO implement WB
 }
 
 
