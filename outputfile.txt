@@ -1,6 +1,6 @@
-Cycle:        0 || Inst at 0x0             | NOP (idle)              | NOP (bubble)            | NOP (bubble)            | NOP (bubble)            |
-Cycle:        1 || Inst at 0x0             | NOP (idle)              | NOP (idle)              | NOP (bubble)            | NOP (bubble)            |
-Cycle:        2 || Inst at 0x0             | NOP (bubble)            | NOP (idle)              | NOP (idle)              | NOP (bubble)            |
+Cycle:        0 || Inst at 0x0             | NOP (idle)              | NOP (idle)              | NOP (idle)              | NOP (idle)              |
+Cycle:        1 || Inst at 0x0             | NOP (idle)              | NOP (idle)              | NOP (idle)              | NOP (idle)              |
+Cycle:        2 || Inst at 0x0             | NOP (bubble)            | NOP (idle)              | NOP (idle)              | NOP (idle)              |
 Cycle:        3 || Inst at 0x0             | NOP (bubble)            | NOP (bubble)            | NOP (idle)              | NOP (idle)              |
 Cycle:        4 || Inst at 0x0             | NOP (bubble)            | NOP (bubble)            | NOP (bubble)            | NOP (idle)              |
 Cycle:        5 || Inst at 0x0             | NOP (bubble)            | NOP (bubble)            | NOP (bubble)            | NOP (bubble)            |

@@ -549,8 +549,8 @@ Status runCycles(uint64_t cycles) {
 
     // Dump pipe state for the last cycle executed in this call
     pipeState.ifPC = pipelineInfo.ifInst.PC;
-    pipeState.ifStatus = NORMAL; // FIXES PRINTING ISSUE BUT IS NOT THE CLEANEST WAY 
-    //pipeState.ifStatus = pipelineInfo.ifInst.status; 
+    //pipeState.ifStatus = NORMAL; // FIXES PRINTING ISSUE BUT IS NOT THE CLEANEST WAY 
+    pipeState.ifStatus = pipelineInfo.ifInst.status; 
     pipeState.idInstr = pipelineInfo.idInst.instruction;
     pipeState.idStatus = pipelineInfo.idInst.status;
     pipeState.exInstr = pipelineInfo.exInst.instruction;
