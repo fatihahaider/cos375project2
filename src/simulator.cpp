@@ -446,7 +446,7 @@ Simulator::Instruction Simulator::simCommit(Instruction inst, REGS &regData) {
 
 Simulator::Instruction Simulator::simIF(uint64_t PC) {
     Instruction inst = simFetch(PC, memory);
-    inst.status = NORMAL;
+    // inst.status = NORMAL;
     return inst; // TODO implement IF 
 }
 
@@ -463,7 +463,7 @@ Simulator::Instruction Simulator::simID(Simulator::Instruction inst) {
     inst = simOperandCollection(inst, regData);
     inst = simNextPCResolution(inst);
 
-    inst.status = NORMAL;
+    // inst.status = NORMAL;
     return inst; // TODO implement ID
 }
 
@@ -480,7 +480,7 @@ Simulator::Instruction Simulator::simEX(Simulator::Instruction inst) {
         inst = simAddrGen(inst);
     }
 
-    inst.status = NORMAL;
+    // inst.status = NORMAL;
     return inst; // TODO implement EX
 }
 
@@ -492,7 +492,7 @@ Simulator::Instruction Simulator::simMEM(Simulator::Instruction inst) {
         inst = simMemAccess(inst, memory);
     }
 
-    inst.status = NORMAL;
+    // inst.status = NORMAL;
     return inst;
 } // TODO implement MEM
 
@@ -506,7 +506,7 @@ Simulator::Instruction Simulator::simWB(Simulator::Instruction inst) {
         inst = simCommit(inst, regData);
     }
 
-    inst.status = NORMAL;
+    // inst.status = NORMAL;
     return inst; // TODO implement WB
 }
 

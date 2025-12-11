@@ -19,15 +19,12 @@ static uint64_t PC = 0; // start PC
 PipeState pipeState = {0};
 
 // stall & stats
-static int loadBranchStallCycles =
-0;                              // remaining cycles of a load->branch stall
+static int loadBranchStallCycles = 0; // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0; // total load-related stall cycles
 
 // cache miss timing
-static int iMissCyclesLeft =
-    0; // remaining extra cycles for current I-cache miss
-static int dMissCyclesLeft =
-    0; // remaining extra cycles for current D-cache miss
+static int iMissCyclesLeft = 0; // remaining extra cycles for current I-cache miss
+static int dMissCyclesLeft = 0; // remaining extra cycles for current D-cache miss
 
 static const uint64_t EXCEPTION_HANDLER_ADDR = 0x8000;
 
@@ -287,9 +284,10 @@ Status runCycles(uint64_t cycles) {
             pipelineInfo.wbInst = nop(BUBBLE);
 
         } else {
-
             pipelineInfo.wbInst = simulator->simWB(prev.memInst);
+            if (!pipelineInfo.wbInst.isNop) {
             pipelineInfo.wbInst.status = NORMAL;
+            }
         }
 
         // WB: halt check (HALT only when it reaches WB)
@@ -352,7 +350,7 @@ Status runCycles(uint64_t cycles) {
         if (dMissCyclesLeft > 0) {
             // In the middle of a D-cache miss: keep the same instruction in MEM
             pipelineInfo.memInst = prev.memInst;
-            pipelineInfo.memInst.status = NORMAL;
+            // pipelineInfo.memInst.status = NORMAL;
             dMissCyclesLeft--;
 
         } else {
@@ -370,20 +368,26 @@ Status runCycles(uint64_t cycles) {
                 if (hit) {
                     // Hit: MEM completes this cycle
                     pipelineInfo.memInst = simulator->simMEM(memInput);
+                    if (!pipelineInfo.memInst.isNop) {
                     pipelineInfo.memInst.status = NORMAL;
+                    }
 
                 } else {
                     // Miss: this instruction enters MEM now, and then stays
                     // for config.missLatency extra cycles.
                     pipelineInfo.memInst = simulator->simMEM(memInput);
+                    if (!pipelineInfo.memInst.isNop) {
                     pipelineInfo.memInst.status = NORMAL;
+                    }
                     dMissCyclesLeft =
                         static_cast<int>(dCache->config.missLatency);
                 }
             } else {
                 // Non-memory instruction: just pass through MEM
                 pipelineInfo.memInst = simulator->simMEM(memInput);
+                if (!pipelineInfo.memInst.isNop) {
                 pipelineInfo.memInst.status = NORMAL;
+                }
             }
         }
 
@@ -392,14 +396,12 @@ Status runCycles(uint64_t cycles) {
             exceptionFromMEM = true;
         }
 
-        dMissActive = (dMissCyclesLeft > 0);
-
         // === 4. EX stage ===
         if (dMissActive) {
             // While a D-miss is active, EX must stall (hold its current
             // instruction)
             pipelineInfo.exInst = prev.exInst;
-            pipelineInfo.exInst.status = NORMAL;
+            // pipelineInfo.exInst.status = NORMAL;
 
         } else if (bubbleEX) {
             pipelineInfo.exInst = nop(BUBBLE);
@@ -412,17 +414,21 @@ Status runCycles(uint64_t cycles) {
             forwardToEX(exInput, prev.exInst, prev.memInst,
                         pipelineInfo.wbInst);
             pipelineInfo.exInst = simulator->simEX(exInput);
+            if (!pipelineInfo.exInst.isNop) {
             pipelineInfo.exInst.status = NORMAL;
+            }
         }
 
         // === 5. ID stage ===
         if (stallID) {
             // hold previous instruction in ID
             pipelineInfo.idInst = prev.idInst;
-            pipelineInfo.idInst.status = NORMAL;
+            // pipelineInfo.idInst.status = NORMAL;
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
+            if (!pipelineInfo.idInst.isNop) {
             pipelineInfo.idInst.status = NORMAL;
+            }
         }
 
         // Forwarding into ID operands (for branches + dependent ALU ops)
@@ -471,7 +477,7 @@ Status runCycles(uint64_t cycles) {
                 // Stalled by data hazard or D-cache miss: hold IF, don't touch
                 // PC or I-cache
                 pipelineInfo.ifInst = prev.ifInst;
-                pipelineInfo.ifInst.status = NORMAL;
+                // pipelineInfo.ifInst.status = NORMAL;
 
             } else if (iMissCyclesLeft > 0) {
 
