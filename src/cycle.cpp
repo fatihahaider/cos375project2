@@ -487,7 +487,7 @@ Status runCycles(uint64_t cycles) {
 
                 // In the middle of an I-cache miss: keep the same instruction
                 // in IF
-                pipelineInfo.ifInst = nop(BUBBLE);
+                // pipelineInfo.ifInst = nop(BUBBLE);
                 pipelineInfo.ifInst.PC = PC; // Preserve PC!
                 iMissCyclesLeft--;
 
@@ -502,7 +502,7 @@ Status runCycles(uint64_t cycles) {
                         simulator->simIF(fetchPC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
                 } else {
-                    pipelineInfo.ifInst = nop(IDLE);
+                    // pipelineInfo.ifInst = nop(IDLE);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
                     iMissCyclesLeft =
                         static_cast<int>(iCache->config.missLatency);
