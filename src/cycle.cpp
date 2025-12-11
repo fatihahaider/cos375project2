@@ -20,7 +20,7 @@ PipeState pipeState = {0};
 
 // stall & stats
 static int loadBranchStallCycles =
-    0;                              // remaining cycles of a load->branch stall
+0;                              // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0; // total load-related stall cycles
 
 // cache miss timing
