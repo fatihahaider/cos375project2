@@ -344,7 +344,7 @@ Status runCycles(uint64_t cycles) {
                 bool hit = dCache->access(
                     memInput.memAddress,
                     memInput.readsMem ? CACHE_READ : CACHE_WRITE
-             );
+                );
 
                 if (hit) {
                     // Hit: MEM completes this cycle
@@ -368,7 +368,7 @@ Status runCycles(uint64_t cycles) {
 
 
         // === 4. EX stage ===
-        if (dMissCyclesLeft > 0) {
+        if (dMissActive) {
             // While a D-miss is active, EX must stall (hold its current instruction)
             pipelineInfo.exInst = prev.exInst;
         } else if (bubbleEX) {
@@ -400,7 +400,6 @@ Status runCycles(uint64_t cycles) {
         
         bool branchInID = isBranch(pipelineInfo.idInst);
         bool branchTaken = false;
-        bool skipIF = false;
 
         if (branchInID) {
             branchTaken = (pipelineInfo.idInst.nextPC != pipelineInfo.idInst.PC + 4);
@@ -441,15 +440,10 @@ Status runCycles(uint64_t cycles) {
             } else {
                 // New fetch opportunity: access I-cache
                 bool hit = iCache->access(PC, CACHE_READ);
-
-                if (hit) {
-                // Hit: normal fetch, completes in IF this cycle
                 pipelineInfo.ifInst = simulator->simIF(PC);
+                if (hit) {
                 PC += 4;  // always-not-taken for now; branch logic later
                 } else {
-                // Miss: instruction appears in IF this cycle, then stays here
-                // for config.missLatency extra cycles.
-                pipelineInfo.ifInst = simulator->simIF(PC);
                 iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
             // DO NOT advance PC; after the miss completes, this instruction
             // will finally move on to ID.
@@ -470,24 +464,24 @@ Status runCycles(uint64_t cycles) {
                 pipelineInfo.idInst = nop(BUBBLE);
                 pipelineInfo.ifInst = nop(BUBBLE);
 
-        // Also make sure the MEM instruction itself does not propagate as a "normal" instruction.
-        // It already has memException=true; simWB will ignore it.
-        // You can optionally mark it as NOP for clarity:
-        // pipelineInfo.memInst.isNop = true;
+                // Also make sure the MEM instruction itself does not propagate as a "normal" instruction.
+                // It already has memException=true; simWB will ignore it.
+                // You can optionally mark it as NOP for clarity:
+                // pipelineInfo.memInst.isNop = true;
             }
 
-            if (exceptionFromID) {
+                if (exceptionFromID) {
                 // Excepting instruction detected in ID.
                 // Older ones in EX/MEM/WB drain.
                 // The illegal instruction itself must not reach EX/WB.
                 // Squash it and any younger IF instruction.
                 pipelineInfo.idInst = nop(BUBBLE);
                 pipelineInfo.ifInst = nop(BUBBLE);
-            }
+                }
 
             // Note: we *don't* touch PC here; PC redirect happens at the
             // top of the *next* cycle when exceptionPending is true.
-            }
+        }
 
     }
 
@@ -541,4 +535,3 @@ Status finalizeSimulator() {
     dumpSimStats(stats, output);
     return SUCCESS;
 }
-
