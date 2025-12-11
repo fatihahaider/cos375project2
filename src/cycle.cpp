@@ -384,7 +384,7 @@ Status runCycles(uint64_t cycles) {
                         pipelineInfo.memInst.status = NORMAL;
                     }
                     dMissCyclesLeft =
-                        static_cast<int>(dCache->config.missLatency) - 1;
+                        static_cast<int>(dCache->config.missLatency);
                     // -1 b/c this cycle counts too
                 }
             } else {
@@ -433,6 +433,8 @@ Status runCycles(uint64_t cycles) {
             // Bubble ID while IF is waiting for mem
             pipelineInfo.idInst = nop(BUBBLE);
             // Cycles decreased elsewhere
+        } else if (prev.ifInst.status == BUBBLE) {
+            pipelineInfo.idInst = nop(BUBBLE);
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
             if (!pipelineInfo.idInst.isNop) {
@@ -510,7 +512,7 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
                     iMissCyclesLeft =
-                        static_cast<int>(iCache->config.missLatency) - 1;
+                        static_cast<int>(iCache->config.missLatency);
                     // -1 b/c this cycle counts too
                 }
 
