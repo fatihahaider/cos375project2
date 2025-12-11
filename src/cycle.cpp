@@ -352,7 +352,7 @@ Status runCycles(uint64_t cycles) {
         if (dMissCyclesLeft > 0) {
             // In the middle of a D-cache miss: keep the same instruction in MEM
             pipelineInfo.memInst = prev.memInst;
-            pipelineInfo.memInst.status = IDLE;
+            pipelineInfo.memInst.status = NORMAL;
             dMissCyclesLeft--;
 
         } else {
@@ -376,7 +376,7 @@ Status runCycles(uint64_t cycles) {
                     // Miss: this instruction enters MEM now, and then stays
                     // for config.missLatency extra cycles.
                     pipelineInfo.memInst = simulator->simMEM(memInput);
-                    pipelineInfo.memInst.status = IDLE;
+                    pipelineInfo.memInst.status = NORMAL;
                     dMissCyclesLeft =
                         static_cast<int>(dCache->config.missLatency);
                 }
@@ -399,7 +399,7 @@ Status runCycles(uint64_t cycles) {
             // While a D-miss is active, EX must stall (hold its current
             // instruction)
             pipelineInfo.exInst = prev.exInst;
-            pipelineInfo.exInst.status = IDLE;
+            pipelineInfo.exInst.status = NORMAL;
 
         } else if (bubbleEX) {
             pipelineInfo.exInst = nop(BUBBLE);
@@ -420,7 +420,7 @@ Status runCycles(uint64_t cycles) {
             // hold previous instruction in ID
             // or if I-cache miss, hold ID
             pipelineInfo.idInst = prev.idInst;
-            pipelineInfo.idInst.status = IDLE;
+            pipelineInfo.idInst.status = NORMAL;
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
             pipelineInfo.idInst.status = NORMAL;
@@ -469,15 +469,16 @@ Status runCycles(uint64_t cycles) {
             if (stallIF) {
                 // Stalled by data hazard or D-cache miss: hold IF, don't touch
                 // PC or I-cache
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch
+                // PC or I-cache
                 pipelineInfo.ifInst = prev.ifInst;
-                pipelineInfo.ifInst.status = IDLE;
+                pipelineInfo.ifInst.status = NORMAL;
 
             } else if (iMissCyclesLeft > 0) {
 
                 // In the middle of an I-cache miss: keep the same instruction
                 // in IF
-                pipelineInfo.ifInst = prev.ifInst;
-                pipelineInfo.ifInst.status = IDLE;
+                pipelineInfo.ifInst = nop(BUBBLE);
                 iMissCyclesLeft--;
 
             } else {
@@ -493,11 +494,16 @@ Status runCycles(uint64_t cycles) {
 
                 } else {
 
-                    pipelineInfo.ifInst.status = IDLE;
+                    pipelineInfo.ifInst = nop(BUBBLE);
                     iMissCyclesLeft =
                         static_cast<int>(iCache->config.missLatency);
                     // DO NOT advance PC; after the miss completes, this
                     // instruction will finally move on to ID.
+                }
+
+                if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
+                    pipelineInfo.ifInst.status == NORMAL) {
+                    pipelineInfo.ifInst.status = SPECULATIVE;
                 }
             }
         } else {
