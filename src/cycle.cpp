@@ -492,23 +492,16 @@ Status runCycles(uint64_t cycles) {
             } else {
                 // New fetch opportunity: access I-cache
                 bool hit = iCache->access(PC, CACHE_READ);
-                pipelineInfo.ifInst =
-                    simulator->simIF(PC); // get instruction once
+                uint64_t fetchPC = PC; // Save PC before incrementing
 
                 if (hit) {
-                    PC += 4;
-                    pipelineInfo.ifInst = simulator->simIF(fetchPC);
+                    PC += 4; // Increment PC first
+                    pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
-                    
-                }else {
-
-                    pipelineInfo.ifInst =
-                        nop(IDLE);               // First cycle of miss is IDLE
-                    pipelineInfo.ifInst.PC = PC; // Preserve PC!
-                    iMissCyclesLeft =
-                        static_cast<int>(iCache->config.missLatency);
-                    // DO NOT advance PC; after the miss completes, this
-                    // instruction will finally move on to ID.
+                } else {
+                    pipelineInfo.ifInst = nop(IDLE);
+                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
                 }
 
                 if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
