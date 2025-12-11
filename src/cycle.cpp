@@ -45,10 +45,10 @@ Simulator::Instruction nop(StageStatus status) {
 
 static struct PipelineInfo {
     Simulator::Instruction ifInst = nop(IDLE);
-    Simulator::Instruction idInst = nop(BUBBLE);  // changed from IDLE
-    Simulator::Instruction exInst = nop(BUBBLE);  // changed from IDLE
-    Simulator::Instruction memInst = nop(BUBBLE); // changed from IDLE
-    Simulator::Instruction wbInst = nop(BUBBLE);  // changed from IDLE
+    Simulator::Instruction idInst = nop(IDLE);  
+    Simulator::Instruction exInst = nop(IDLE);  
+    Simulator::Instruction memInst = nop(IDLE); 
+    Simulator::Instruction wbInst = nop(IDLE);  
 } pipelineInfo;
 
 // checks type of instruction
