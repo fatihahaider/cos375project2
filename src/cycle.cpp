@@ -429,26 +429,41 @@ Status runCycles(uint64_t cycles) {
         // === 6. IF stage (with I-cache timing) ===
 
         if(!skipIF) {
+
             if (stallIF) {
                 // Stalled by data hazard or D-cache miss: hold IF, don't touch PC or I-cache
                 pipelineInfo.ifInst = prev.ifInst;
+                pipelineInfo.ifInst.status = STALL;
+
             } else if (iMissCyclesLeft > 0) {
+
                 // In the middle of an I-cache miss: keep the same instruction in IF
                 pipelineInfo.ifInst = prev.ifInst;
+                pipelineInfo.ifInst.status = WAIT;
                 iMissCyclesLeft--;
-            // PC does NOT advance while waiting for this miss to resolve
+            
             } else {
                 // New fetch opportunity: access I-cache
                 bool hit = iCache->access(PC, CACHE_READ);
-                pipelineInfo.ifInst = simulator->simIF(PC);
+                pipelineInfo.ifInst = simulator->simIF(PC); // get instruction once
+                
                 if (hit) {
-                PC += 4;  // always-not-taken for now; branch logic later
+
+                    pipelineInfo.ifInst.status= NORMAL;
+                    PC += 4;  // always-not-taken for now; branch logic later
+
                 } else {
-                iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
-            // DO NOT advance PC; after the miss completes, this instruction
-            // will finally move on to ID.
+
+                    pipelineInfo.ifInst.status = WAIT;
+                    iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
+                    // DO NOT advance PC; after the miss completes, this instruction
+                    // will finally move on to ID.
                 }
             }
+        } else {
+
+            // Branch squashed the IF stage this cycle
+            pipelineInfo.ifInst = nop(SQUASHED);
         }
 
         // === 7. Handle exceptions: squash and arm trap ===
@@ -508,6 +523,12 @@ Status runTillHalt() {
     Status status;
     while (true) {
         status = static_cast<Status>(runCycles(1));
+
+        // DEBUG: print every 100k cycles so we know it's alive
+        if (cycleCount % 100000 == 0) {
+            std::cerr << "[DEBUG] cycleCount = " << cycleCount << std::endl;
+        }
+        
         if (status == HALT) break;
     }
     return status;

@@ -99,6 +99,8 @@ enum StageStatus {
     IDLE,
     SPECULATIVE,
     SQUASHED,
+    STALL,
+    WAIT
 };
 
 static const std::unordered_map<StageStatus, std::string> stageStatusStr = {
