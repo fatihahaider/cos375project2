@@ -288,9 +288,6 @@ Status runCycles(uint64_t cycles) {
             pipelineInfo.wbInst = simulator->simWB(prev.memInst);
 
             if (!pipelineInfo.wbInst.isNop) {
-                pipelineInfo.wbInst.status = BUBBLE;
-
-            } else {
                 pipelineInfo.wbInst.status = NORMAL;
             }
         }
