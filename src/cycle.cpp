@@ -555,7 +555,8 @@ Status runCycles(uint64_t cycles) {
 
     // Dump pipe state for the last cycle executed in this call
     pipeState.ifPC = pipelineInfo.ifInst.PC;
-    pipeState.ifStatus = pipelineInfo.ifInst.status;
+    pipeState.ifStatus = NORMAL;
+    //pipeState.ifStatus = pipelineInfo.ifInst.status;
     pipeState.idInstr = pipelineInfo.idInst.instruction;
     pipeState.idStatus = pipelineInfo.idInst.status;
     pipeState.exInstr = pipelineInfo.exInst.instruction;
