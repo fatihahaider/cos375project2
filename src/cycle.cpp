@@ -162,6 +162,63 @@ static void forwardToID(Simulator::Instruction &idInst,
     }
 }
 
+ // Helper Function to Forward into EX stage 3 Different Ways 
+    static void forwardToEX(Simulator::Instruction &exInput,
+        const Simulator::Instruction &exInst,
+        const Simulator::Instruction &memInst,
+        const Simulator::Instruction &wbInst) {
+
+    // register 1 
+    if (exInput.readsRs1 && exInput.rs1 != 0) {
+
+        // EX/MEM → EX
+        if (exInst.writesRd && exInst.rd == exInput.rs1 && !isLoad(exInst)) {
+            exInput.op1Val = exInst.arithResult;
+        }
+
+        // MEM/WB → EX
+        else if (memInst.writesRd && memInst.rd == exInput.rs1) {
+            if (isLoad(memInst))
+                exInput.op1Val = memInst.memResult;
+            else if (memInst.doesArithLogic)
+                exInput.op1Val = memInst.arithResult;
+        }
+
+        // WB → EX
+        else if (wbInst.writesRd && wbInst.rd == exInput.rs1) {
+            if (isLoad(wbInst))
+                exInput.op1Val = wbInst.memResult;
+            else if (wbInst.doesArithLogic)
+                exInput.op1Val = wbInst.arithResult;
+        }
+    }
+
+    // register 2 
+    if (exInput.readsRs2 && exInput.rs2 != 0) {
+
+        // EX/MEM → EX
+        if (exInst.writesRd && exInst.rd == exInput.rs2 && !isLoad(exInst)) {
+            exInput.op2Val = exInst.arithResult;
+        }
+
+        // MEM/WB → EX
+        else if (memInst.writesRd && memInst.rd == exInput.rs2) {
+            if (isLoad(memInst))
+                exInput.op2Val = memInst.memResult;
+            else if (memInst.doesArithLogic)
+                exInput.op2Val = memInst.arithResult;
+        }
+
+        // WB → EX
+        else if (wbInst.writesRd && wbInst.rd == exInput.rs2) {
+            if (isLoad(wbInst))
+                exInput.op2Val = wbInst.memResult;
+            else if (wbInst.doesArithLogic)
+                exInput.op2Val = wbInst.arithResult;
+        }
+    }
+}
+
 // Forward loaded value from WB into store's rs2 before MEM
 static void forwardLoadToStore(Simulator::Instruction &memInst,
                                const Simulator::Instruction &wbInst) {
@@ -183,13 +240,15 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
-    PipeState pipeState = {0,};
+    PipeState pipeState = {0};
     while (cycles == 0 || count < cycles) {
         pipeState.cycle = cycleCount;
         count++;
         cycleCount++;
         bool exceptionFromID  = false;
         bool exceptionFromMEM = false;
+        bool skipIF = false;
+        bool dMissActive = (dMissCyclesLeft > 0);
 
         // If we raised an exception last cycle, redirect PC now
         if (exceptionPending) {
@@ -205,7 +264,7 @@ Status runCycles(uint64_t cycles) {
         PipelineInfo prev = pipelineInfo;
 
         // === 1. WB stage ===
-        if (dMissCyclesLeft > 0) {
+        if (dMissActive) {
             // The memory instruction hasn't finished its miss yet,
          // so nothing can commit this cycle.
             pipelineInfo.wbInst = nop(BUBBLE);
@@ -228,16 +287,6 @@ Status runCycles(uint64_t cycles) {
         bool arithBranchHazard = hasArithBranchHazard(prev.exInst, prev.idInst);
         bool loadBranchHazard  = hasLoadBranchHazard(prev.exInst, prev.idInst);
 
-        // === 2.5 D-cache miss: stall IF/ID/EX while miss in MEM ===
-        bool dMissActive = (dMissCyclesLeft > 0);
-        if (dMissActive) {
-            // Current MEM instruction is waiting on a D-cache miss.
-            // Younger instructions must stall; EX should hold its current instruction
-            // (so do NOT bubble it because of the miss).
-            stallIF = true;
-            stallID = true;
-        }
-
         // Special case: load->store (using rd only as rs2) should NOT stall
         if (loadUseHazard && isStore(prev.idInst) &&
             prev.idInst.readsRs2 && !prev.idInst.readsRs1 &&
@@ -250,7 +299,6 @@ Status runCycles(uint64_t cycles) {
             stallIF = stallID = true;
             bubbleEX = true;
             loadBranchStallCycles--;
-            // loadStallCount++; not to be incremented because it is the same event?
 
         } else if (loadBranchHazard) {
             // start a 2-cycle load->branch stall
@@ -271,8 +319,17 @@ Status runCycles(uint64_t cycles) {
             bubbleEX = true;
         }
 
+         // === 2.5 D-cache miss: stall IF/ID/EX while miss in MEM ===
+        if (dMissActive) {
+            // Current MEM instruction is waiting on a D-cache miss.
+            // Younger instructions must stall; EX should hold its current instruction
+            // (so do NOT bubble it because of the miss).
+            stallIF = true;
+            stallID = true;
+        }
+
         // === 3. MEM stage (with D-cache timing + load->store forwarding) ===
-        if (dMissCyclesLeft > 0) {
+        if (dMissActive) {
             // In the middle of a D-cache miss: keep the same instruction in MEM
             pipelineInfo.memInst = prev.memInst;
             dMissCyclesLeft--;
@@ -317,7 +374,13 @@ Status runCycles(uint64_t cycles) {
         } else if (bubbleEX) {
             pipelineInfo.exInst = nop(BUBBLE);
         } else {
-            pipelineInfo.exInst = simulator->simEX(prev.idInst);
+
+            Simulator::Instruction exInput = prev.idInst;
+            
+            // forwarding into ex stage 
+            forwardToEX(exInput, prev.exInst, prev.memInst, pipelineInfo.wbInst);
+
+            pipelineInfo.exInst = simulator->simEX(exInput);
         }
 
 
@@ -334,6 +397,28 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.exInst,
                     pipelineInfo.memInst,
                     pipelineInfo.wbInst);
+        
+        bool branchInID = isBranch(pipelineInfo.idInst);
+        bool branchTaken = false;
+        bool skipIF = false;
+
+        if (branchInID) {
+            branchTaken = (pipelineInfo.idInst.nextPC != pipelineInfo.idInst.PC + 4);
+        }
+
+        if (branchInID && branchTaken &&
+            !stallID && !stallIF &&
+            !exceptionFromID && !exceptionFromMEM) {
+
+            // Squash mispredicted instruction in IF
+            pipelineInfo.ifInst = nop(SQUASHED);
+
+            // Redirect PC to branch target
+            PC = pipelineInfo.idInst.nextPC;
+
+            // Skip IF fetch logic below
+            skipIF = true;
+        }
 
         // Detect illegal instruction exception in ID
         if (!pipelineInfo.idInst.isNop &&
@@ -343,29 +428,32 @@ Status runCycles(uint64_t cycles) {
         }
 
         // === 6. IF stage (with I-cache timing) ===
-        if (stallIF) {
-            // Stalled by data hazard or D-cache miss: hold IF, don't touch PC or I-cache
-            pipelineInfo.ifInst = prev.ifInst;
-        } else if (iMissCyclesLeft > 0) {
-            // In the middle of an I-cache miss: keep the same instruction in IF
-            pipelineInfo.ifInst = prev.ifInst;
-            iMissCyclesLeft--;
-        // PC does NOT advance while waiting for this miss to resolve
-        } else {
-            // New fetch opportunity: access I-cache
-            bool hit = iCache->access(PC, CACHE_READ);
 
-            if (hit) {
-            // Hit: normal fetch, completes in IF this cycle
-            pipelineInfo.ifInst = simulator->simIF(PC);
-            PC += 4;  // always-not-taken for now; branch logic later
+        if(!skipIF) {
+            if (stallIF) {
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch PC or I-cache
+                pipelineInfo.ifInst = prev.ifInst;
+            } else if (iMissCyclesLeft > 0) {
+                // In the middle of an I-cache miss: keep the same instruction in IF
+                pipelineInfo.ifInst = prev.ifInst;
+                iMissCyclesLeft--;
+            // PC does NOT advance while waiting for this miss to resolve
             } else {
-            // Miss: instruction appears in IF this cycle, then stays here
-            // for config.missLatency extra cycles.
-            pipelineInfo.ifInst = simulator->simIF(PC);
-            iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
-        // DO NOT advance PC; after the miss completes, this instruction
-        // will finally move on to ID.
+                // New fetch opportunity: access I-cache
+                bool hit = iCache->access(PC, CACHE_READ);
+
+                if (hit) {
+                // Hit: normal fetch, completes in IF this cycle
+                pipelineInfo.ifInst = simulator->simIF(PC);
+                PC += 4;  // always-not-taken for now; branch logic later
+                } else {
+                // Miss: instruction appears in IF this cycle, then stays here
+                // for config.missLatency extra cycles.
+                pipelineInfo.ifInst = simulator->simIF(PC);
+                iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
+            // DO NOT advance PC; after the miss completes, this instruction
+            // will finally move on to ID.
+                }
             }
         }
 
