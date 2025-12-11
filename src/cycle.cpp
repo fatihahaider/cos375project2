@@ -479,7 +479,7 @@ Status runCycles(uint64_t cycles) {
                 // Stalled by data hazard or D-cache miss: hold IF, don't touch
                 // PC or I-cache
                 pipelineInfo.ifInst = prev.ifInst;
-                // pipelineInfo.ifInst.status = NORMAL;
+                pipelineInfo.ifInst.status = NORMAL;
 
             } else if (iMissCyclesLeft > 0) {
 
