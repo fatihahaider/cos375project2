@@ -16,6 +16,8 @@ static uint64_t cycleCount = 0;
 
 static uint64_t PC = 0; // start PC
 
+PipeState pipeState = {0};
+
 // stall & stats
 static int loadBranchStallCycles =
     0;                              // remaining cycles of a load->branch stall
@@ -96,9 +98,9 @@ static bool hasArithBranchHazard(const Simulator::Instruction &producer,
     if (producer.rd == 0)
         return false;
 
-    bool rs1Haz = consumer.readsRs1 && (consumer.rs1 == producer.rd);
-    bool rs2Haz = consumer.readsRs2 && (consumer.rs2 == producer.rd);
-    return rs1Haz || rs2Haz;
+    // We will handle Arith->Branch by forwarding + recalculating nextPC in ID.
+    // So we do NOT need to stall.
+    return false;
 }
 
 // load -> branch: load producer in EX, branch in ID
@@ -254,8 +256,9 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
-    PipeState pipeState = {0};
     while (cycles == 0 || count < cycles) {
+        std::cout << cycleCount << "\n";
+
         pipeState.cycle = cycleCount;
         count++;
         cycleCount++;
@@ -306,7 +309,8 @@ Status runCycles(uint64_t cycles) {
 
         // Special case: load->store (using rd only as rs2) should NOT stall
         if (loadUseHazard && isStore(prev.idInst) && prev.idInst.readsRs2 &&
-            !prev.idInst.readsRs1 && prev.idInst.rs2 == prev.exInst.rd) {
+            !(prev.idInst.readsRs1 && prev.idInst.rs1 == prev.exInst.rd) &&
+            prev.idInst.rs2 == prev.exInst.rd) {
             loadUseHazard = false;
         }
 
@@ -425,6 +429,11 @@ Status runCycles(uint64_t cycles) {
         // Forwarding into ID operands (for branches + dependent ALU ops)
         forwardToID(pipelineInfo.idInst, pipelineInfo.exInst,
                     pipelineInfo.memInst, pipelineInfo.wbInst);
+
+        // Crucial Fix: Re-calculate nextPC now that op1Val/op2Val might have
+        // changed due to forwarding
+        pipelineInfo.idInst =
+            simulator->simNextPCResolution(pipelineInfo.idInst);
 
         bool branchInID = isBranch(pipelineInfo.idInst);
         bool branchTaken = false;
