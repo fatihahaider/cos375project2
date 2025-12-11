@@ -496,14 +496,11 @@ Status runCycles(uint64_t cycles) {
                     simulator->simIF(PC); // get instruction once
 
                 if (hit) {
-
+                    PC += 4;
+                    pipelineInfo.ifInst = simulator->simIF(fetchPC);
                     pipelineInfo.ifInst.status = NORMAL;
-
-                    if (!stallIF && prev.idInst.status != BUBBLE) { // added because without, causing the early fetch issue
-                        PC += 4; 
-                    }
-
-                } else {
+                    
+                }else {
 
                     pipelineInfo.ifInst =
                         nop(IDLE);               // First cycle of miss is IDLE
@@ -570,18 +567,9 @@ Status runCycles(uint64_t cycles) {
     pipeState.wbInstr = pipelineInfo.wbInst.instruction;
     pipeState.wbStatus = pipelineInfo.wbInst.status;
 
+    }
+
     dumpPipeState(pipeState, output);
-
-    if (pipelineInfo.wbInst.isHalt) {
-        status = HALT;
-        break;
-    }
-
-    count++;
-    cycleCount++;
-
-    }
-
     return status;
 }
 
