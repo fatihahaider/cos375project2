@@ -475,7 +475,7 @@ Status runCycles(uint64_t cycles) {
             exceptionFromID = true;
         }
 
-        // === 6. IF stage (with I-cache timing) ===
+        // === 6. IF stage (with I-cache timing)  ===
 
         if (!skipIF) {
 
