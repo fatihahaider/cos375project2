@@ -487,7 +487,7 @@ Status runCycles(uint64_t cycles) {
 
                 // In the middle of an I-cache miss: keep the same instruction
                 // in IF
-                pipelineInfo.ifInst = nop(NORMAL);
+                pipelineInfo.ifInst = nop(BUBBLE);
                 pipelineInfo.ifInst.PC = PC; // Preserve PC!
                 iMissCyclesLeft--;
 
