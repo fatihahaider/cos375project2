@@ -469,18 +469,24 @@ Status runCycles(uint64_t cycles) {
             exceptionFromID = true;
         }
 
-        // === 6. IF stage (with I-cache timing) ===
+       // === 6. IF stage (with I-cache timing) ===
 
         if (!skipIF) {
 
             if (stallIF) {
-                
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch
+                // PC or I-cache
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch
+                // PC or I-cache
                 pipelineInfo.ifInst = prev.ifInst;
+                pipelineInfo.ifInst.status = NORMAL;
 
             } else if (iMissCyclesLeft > 0) {
 
-                // We are waiting out a miss; do not advance PC or fetch anything
-                pipelineInfo.ifInst = prev.ifInst; // <- Keep the same instruction in IF
+                // In the middle of an I-cache miss: keep the same instruction
+                // in IF
+                pipelineInfo.ifInst = nop(BUBBLE);
+                pipelineInfo.ifInst.PC = PC; // Preserve PC!
                 iMissCyclesLeft--;
 
             } else {
@@ -492,20 +498,21 @@ Status runCycles(uint64_t cycles) {
                     PC += 4; // Increment PC first
                     pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
-
-                    // Mark speculative if branch
-                    if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63) {
-                        pipelineInfo.ifInst.status = SPECULATIVE;
-                    }
-
                 } else {
-                // Cache miss: stall here, but don't insert a NOP yet
-                iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
-                pipelineInfo.ifInst = prev.ifInst; // <- Hold IF until miss completes
-                    }
+                    pipelineInfo.ifInst = nop(IDLE);
+                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
                 }
-            } else {
-                pipelineInfo.ifInst = nop(SQUASHED);
+
+                if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
+                    pipelineInfo.ifInst.status == NORMAL) {
+                    pipelineInfo.ifInst.status = SPECULATIVE;
+                }
+            }
+        } else {
+
+            // Branch squashed the IF stage this cycle
+            pipelineInfo.ifInst = nop(SQUASHED);
         }
 
         // === 7. Handle exceptions: squash and arm trap ===
