@@ -556,8 +556,6 @@ Status runCycles(uint64_t cycles) {
             // Note: we *don't* touch PC here; PC redirect happens at the
             // top of the *next* cycle when exceptionPending is true.
         }
-    
-    }
 
     // Dump pipe state for the last cycle executed in this call
     pipeState.ifPC = pipelineInfo.ifInst.PC;
@@ -573,6 +571,17 @@ Status runCycles(uint64_t cycles) {
     pipeState.wbStatus = pipelineInfo.wbInst.status;
 
     dumpPipeState(pipeState, output);
+
+    if (pipelineInfo.wbInst.isHalt) {
+        status = HALT;
+        break;
+    }
+
+    count++;
+    cycleCount++;
+
+    }
+
     return status;
 }
 
