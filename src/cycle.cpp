@@ -45,10 +45,10 @@ Simulator::Instruction nop(StageStatus status) {
 
 static struct PipelineInfo {
     Simulator::Instruction ifInst = nop(IDLE);
-    Simulator::Instruction idInst = nop(IDLE);
-    Simulator::Instruction exInst = nop(IDLE);
-    Simulator::Instruction memInst = nop(IDLE);
-    Simulator::Instruction wbInst = nop(IDLE);
+    Simulator::Instruction idInst = nop(BUBBLE);  // changed from IDLE
+    Simulator::Instruction exInst = nop(BUBBLE);  // changed from IDLE
+    Simulator::Instruction memInst = nop(BUBBLE); // changed from IDLE
+    Simulator::Instruction wbInst = nop(BUBBLE);  // changed from IDLE
 } pipelineInfo;
 
 // checks type of instruction
@@ -498,7 +498,10 @@ Status runCycles(uint64_t cycles) {
                 if (hit) {
 
                     pipelineInfo.ifInst.status = NORMAL;
-                    PC += 4; // always-not-taken for now; branch logic later
+
+                    if (!stallIF && prev.idInst.status != BUBBLE) { // added because without, causing the early fetch issue
+                        PC += 4; 
+                    }
 
                 } else {
 
