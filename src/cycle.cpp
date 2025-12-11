@@ -171,12 +171,12 @@ static void forwardToID(Simulator::Instruction &idInst,
     // register 1 
     if (exInput.readsRs1 && exInput.rs1 != 0) {
 
-        // EX/MEM → EX
+        // EX/MEM -> EX
         if (exInst.writesRd && exInst.rd == exInput.rs1 && !isLoad(exInst)) {
             exInput.op1Val = exInst.arithResult;
         }
 
-        // MEM/WB → EX
+        // MEM/WB -> EX
         else if (memInst.writesRd && memInst.rd == exInput.rs1) {
             if (isLoad(memInst))
                 exInput.op1Val = memInst.memResult;
@@ -184,7 +184,7 @@ static void forwardToID(Simulator::Instruction &idInst,
                 exInput.op1Val = memInst.arithResult;
         }
 
-        // WB → EX
+        // WB -> EX
         else if (wbInst.writesRd && wbInst.rd == exInput.rs1) {
             if (isLoad(wbInst))
                 exInput.op1Val = wbInst.memResult;
@@ -196,12 +196,12 @@ static void forwardToID(Simulator::Instruction &idInst,
     // register 2 
     if (exInput.readsRs2 && exInput.rs2 != 0) {
 
-        // EX/MEM → EX
+        // EX/MEM -> EX
         if (exInst.writesRd && exInst.rd == exInput.rs2 && !isLoad(exInst)) {
             exInput.op2Val = exInst.arithResult;
         }
 
-        // MEM/WB → EX
+        // MEM/WB -> EX
         else if (memInst.writesRd && memInst.rd == exInput.rs2) {
             if (isLoad(memInst))
                 exInput.op2Val = memInst.memResult;
@@ -209,7 +209,7 @@ static void forwardToID(Simulator::Instruction &idInst,
                 exInput.op2Val = memInst.arithResult;
         }
 
-        // WB → EX
+        // WB -> EX
         else if (wbInst.writesRd && wbInst.rd == exInput.rs2) {
             if (isLoad(wbInst))
                 exInput.op2Val = wbInst.memResult;
@@ -252,12 +252,12 @@ Status runCycles(uint64_t cycles) {
 
         // If we raised an exception last cycle, redirect PC now
         if (exceptionPending) {
-        PC = EXCEPTION_HANDLER_ADDR;
-        exceptionPending = false;
+            PC = EXCEPTION_HANDLER_ADDR;
+            exceptionPending = false;
 
-        // Start fresh in IF/ID; older instructions in EX/MEM/WB will drain
-        pipelineInfo.ifInst = nop(IDLE);
-        pipelineInfo.idInst = nop(IDLE);
+            // Start fresh in IF/ID; older instructions in EX/MEM/WB will drain
+            pipelineInfo.ifInst = nop(IDLE);
+            pipelineInfo.idInst = nop(IDLE);
         }
 
         // Snapshot previous pipeline state at start of cycle
@@ -266,10 +266,13 @@ Status runCycles(uint64_t cycles) {
         // === 1. WB stage ===
         if (dMissActive) {
             // The memory instruction hasn't finished its miss yet,
-         // so nothing can commit this cycle.
+            // so nothing can commit this cycle.
             pipelineInfo.wbInst = nop(BUBBLE);
+
         } else {
+
          pipelineInfo.wbInst = simulator->simWB(prev.memInst);
+         pipelineInfo.wbInst.status = NORMAL; 
         }
 
         // WB: halt check (HALT only when it reaches WB)
@@ -329,14 +332,16 @@ Status runCycles(uint64_t cycles) {
         }
 
         // === 3. MEM stage (with D-cache timing + load->store forwarding) ===
-        if (dMissActive) {
+        if (dMissCyclesLeft > 0) {
             // In the middle of a D-cache miss: keep the same instruction in MEM
             pipelineInfo.memInst = prev.memInst;
+            pipelineInfo.memInst.status = WAIT;
             dMissCyclesLeft--;
-            // No new memory access; the outstanding miss is still in flight.
+
         } else {
             // Potentially new memory access coming from EX
             Simulator::Instruction memInput = prev.exInst;
+
             // forward from WB (load result) into store data if needed
             forwardLoadToStore(memInput, pipelineInfo.wbInst);
 
@@ -349,15 +354,19 @@ Status runCycles(uint64_t cycles) {
                 if (hit) {
                     // Hit: MEM completes this cycle
                     pipelineInfo.memInst = simulator->simMEM(memInput);
+                    pipelineInfo.memInst.status = NORMAL;
+                    
                 } else {
                     // Miss: this instruction enters MEM now, and then stays
                     // for config.missLatency extra cycles.
                     pipelineInfo.memInst = simulator->simMEM(memInput);
+                    pipelineInfo.memInst.status = WAIT;
                     dMissCyclesLeft = static_cast<int>(dCache->config.missLatency);
                 }
             } else {
                 // Non-memory instruction: just pass through MEM
                 pipelineInfo.memInst = simulator->simMEM(memInput);
+                pipelineInfo.memInst.status = NORMAL;
             }
         }
 
@@ -366,21 +375,25 @@ Status runCycles(uint64_t cycles) {
             exceptionFromMEM = true;
         }
 
+        dMissActive = (dMissCyclesLeft > 0);
 
         // === 4. EX stage ===
         if (dMissActive) {
             // While a D-miss is active, EX must stall (hold its current instruction)
             pipelineInfo.exInst = prev.exInst;
+            pipelineInfo.exInst.status = STALL;
+
         } else if (bubbleEX) {
             pipelineInfo.exInst = nop(BUBBLE);
+
         } else {
 
             Simulator::Instruction exInput = prev.idInst;
             
             // forwarding into ex stage 
             forwardToEX(exInput, prev.exInst, prev.memInst, pipelineInfo.wbInst);
-
             pipelineInfo.exInst = simulator->simEX(exInput);
+            pipelineInfo.exInst.status = NORMAL;
         }
 
 
@@ -388,8 +401,12 @@ Status runCycles(uint64_t cycles) {
         if (stallID) {
             // hold previous instruction in ID
             pipelineInfo.idInst = prev.idInst;
+            pipelineInfo.idInst.status = STALL;
+
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
+            pipelineInfo.idInst.status = NORMAL;
+
         }
 
         // Forwarding into ID operands (for branches + dependent ALU ops)
@@ -523,11 +540,6 @@ Status runTillHalt() {
     Status status;
     while (true) {
         status = static_cast<Status>(runCycles(1));
-
-        // DEBUG: print every 100k cycles so we know it's alive
-        if (cycleCount % 100000 == 0) {
-            std::cerr << "[DEBUG] cycleCount = " << cycleCount << std::endl;
-        }
         
         if (status == HALT) break;
     }

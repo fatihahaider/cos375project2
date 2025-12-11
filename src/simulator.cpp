@@ -5,8 +5,6 @@
 #include <stdexcept>
 using namespace std;
 
-#define EXCEPTION_HANDLER 0x8000
-
 Simulator::Simulator() {
     // Initialize member variables
     memory = nullptr;
@@ -405,27 +403,29 @@ Simulator::Instruction Simulator::simMemAccess(Instruction inst, MemoryStore *my
                     (inst.funct3 == FUNCT3_H || inst.funct3 == FUNCT3_HU) ? HALF_SIZE :
                     (inst.funct3 == FUNCT3_W || inst.funct3 == FUNCT3_WU) ? WORD_SIZE : DOUBLE_SIZE;
 
-        // Assume MemoryStore methods indicate failure somehow; replace "ok" as needed.
-        bool ok = true;
         if (inst.readsMem) {
-        uint64_t value = 0;
-        ok = myMem->getMemValue(inst.memAddress, value, size);  // if this returns Status, check it instead
-        if (!ok) {
+        uint64_t loadedValue = 0;
+
+        int memStatus = myMem->getMemValue(inst.memAddress, loadedValue, size);
+        if (memStatus != 0) {
+
             inst.memException = true;
             return inst;   // do NOT update memResult
         }
 
         if (inst.funct3 == FUNCT3_B || inst.funct3 == FUNCT3_H || inst.funct3 == FUNCT3_W) {
-            inst.memResult = sext64(value, size * 8 - 1);
-    } else {
-        inst.memResult = value;
-    }
-    } else if (inst.writesMem) {
-    ok = myMem->setMemValue(inst.memAddress, inst.op2Val, size);
-    if (!ok) {
-        inst.memException = true;
-        return inst;   // write did NOT happen
-    }
+            inst.memResult = sext64(loadedValue, size * 8 - 1);
+        } else {
+            inst.memResult = loadedValue;
+        }
+    } 
+
+    else if (inst.writesMem) {
+        int memStatus = myMem->setMemValue(inst.memAddress, inst.op2Val, size);
+        if (memStatus != 0) {
+            inst.memException = true;
+            return inst;   // write did NOT happen
+        }
     }
     return inst;
 

@@ -10,17 +10,10 @@ using namespace std;
 /* static std::mt19937 generator(42);  Fixed seed for deterministic results
 std::uniform_real_distribution<double> distribution(0.0, 1.0); */
 
-// Constructor definition
-Cache::Cache(CacheConfig configParam, CacheDataType cacheType) : hits(0), misses(0), 
-type(cacheType), numSets(0), blockOffsetBits(0), indexBits(0), 
-globalCounter(0),
-sets(),
-config(configParam)
+Cache::Cache(CacheConfig configParam, CacheDataType cacheType) : 
+hits(0), misses(0), globalCounter(0), type(cacheType), config(configParam)
 {
-    // Here you can initialize other cache-specific attributes
-    // For instance, if you had cache tables or other structures, initialize them here
-
-    // number of sets = total_size / (block_size * ways)
+    // Invariant: cacheSize is divisible by blockSize * ways
     numSets = config.cacheSize / (config.blockSize * config.ways);
 
     // compute bits for block offset and index (assume powers of 2)
@@ -52,25 +45,30 @@ bool Cache::access(uint64_t address, CacheOperation readWrite) {
 
     auto &set = sets[setIndex];
 
-    // 1) Look for a hit
+    // Check for hit in any one of the ways
     int hitWay = -1;
-    for (uint64_t w = 0; w < config.ways; ++w) {
+    for (uint64_t w = 0; w < config.ways; w++) {
         if (set[w].valid && set[w].tag == tag) {
             hitWay = static_cast<int>(w);
             break;
         }
     }
 
+    // Cache Hit
     if (hitWay != -1) {
-        // HIT: update LRU info
         hits++;
-        set[hitWay].lruCounter = globalCounter;
+        set[hitWay].lruCounter = globalCounter; // LRU timing update
         return true;
     }
 
-    // 2) Miss: find an invalid line first
+    // ---------------------
+    //      Cache Miss
+    // ---------------------
+
     misses++;
     int victimWay = -1;
+
+    // Check for invalid way
     for (uint64_t w = 0; w < config.ways; ++w) {
         if (!set[w].valid) {
             victimWay = static_cast<int>(w);
@@ -78,10 +76,11 @@ bool Cache::access(uint64_t address, CacheOperation readWrite) {
         }
     }
 
-    // 3) If no invalid line, choose the true LRU (smallest lruCounter)
+    // If no invalid way, evict the LRU. 
     if (victimWay == -1) {
-        uint64_t minCounter = set[0].lruCounter;
         victimWay = 0;
+        uint64_t minCounter = set[0].lruCounter;
+
         for (uint64_t w = 1; w < config.ways; ++w) {
             if (set[w].lruCounter < minCounter) {
                 minCounter = set[w].lruCounter;
@@ -119,3 +118,4 @@ Status Cache::dump(const std::string& base_output_name) {
         return ERROR;
     }
 }
+
