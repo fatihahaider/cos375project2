@@ -280,14 +280,18 @@ Status runCycles(uint64_t cycles) {
 
         // === 1. WB stage ===
         if (dMissActive) {
-            // The memory instruction hasn't finished its miss yet,
+            // The memory instruction hasn't finished its miss yet,dMissActive
             // so nothing can commit this cycle.
             pipelineInfo.wbInst = nop(BUBBLE);
 
         } else {
             pipelineInfo.wbInst = simulator->simWB(prev.memInst);
+
             if (!pipelineInfo.wbInst.isNop) {
-            pipelineInfo.wbInst.status = NORMAL;
+                pipelineInfo.wbInst.status = BUBBLE;
+
+            } else {
+                pipelineInfo.wbInst.status = NORMAL;
             }
         }
 
@@ -553,6 +557,7 @@ Status runCycles(uint64_t cycles) {
             // top of the *next* cycle when exceptionPending is true.
         }
     
+    }
 
     // Dump pipe state for the last cycle executed in this call
     pipeState.ifPC = pipelineInfo.ifInst.PC;
@@ -568,14 +573,6 @@ Status runCycles(uint64_t cycles) {
     pipeState.wbStatus = pipelineInfo.wbInst.status;
 
     dumpPipeState(pipeState, output);
-
-    if (pipelineInfo.wbInst.isHalt) {
-            status = HALT;
-            break;
-        }
-
-    }
-    
     return status;
 }
 
