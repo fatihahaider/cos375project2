@@ -155,3 +155,51 @@ Cycle:      153 || Inst at 0x3c            | HALT                    | blt zero,
 Cycle:      154 || Inst at 0x0 (bubble)    | NOP (bubble)            | HALT                    | blt zero, t1, -24       | addi t1, t1, -1         |
 Cycle:      155 || Inst at 0x8000 (bubble) | NOP (idle)              | NOP (idle)              | HALT                    | blt zero, t1, -24       |
 Cycle:      156 || Inst at 0x8000 (bubble) | NOP (idle)              | NOP (idle)              | HALT                    | blt zero, t1, -24       |
+
+
+
+// === 6. IF stage (with I-cache timing) ===
+
+        if (!skipIF) {
+
+            if (stallIF) {
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch
+                // PC or I-cache
+                // Stalled by data hazard or D-cache miss: hold IF, don't touch
+                // PC or I-cache
+                pipelineInfo.ifInst = prev.ifInst;
+                pipelineInfo.ifInst.status = NORMAL;
+
+            } else if (iMissCyclesLeft > 0) {
+
+                // In the middle of an I-cache miss: keep the same instruction
+                // in IF
+                pipelineInfo.ifInst = nop(BUBBLE);
+                pipelineInfo.ifInst.PC = PC; // Preserve PC!
+                iMissCyclesLeft--;
+
+            } else {
+                // New fetch opportunity: access I-cache
+                bool hit = iCache->access(PC, CACHE_READ);
+                uint64_t fetchPC = PC; // Save PC before incrementing
+
+                if (hit) {
+                    PC += 4; // Increment PC first
+                    pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
+                    pipelineInfo.ifInst.status = NORMAL;
+                } else {
+                    pipelineInfo.ifInst = nop(IDLE);
+                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
+                }
+
+                if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
+                    pipelineInfo.ifInst.status == NORMAL) {
+                    pipelineInfo.ifInst.status = SPECULATIVE;
+                }
+            }
+        } else {
+
+            // Branch squashed the IF stage this cycle
+            pipelineInfo.ifInst = nop(SQUASHED);
+        }

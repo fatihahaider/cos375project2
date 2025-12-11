@@ -469,49 +469,42 @@ Status runCycles(uint64_t cycles) {
             exceptionFromID = true;
         }
 
-       // === 6. IF stage (with I-cache timing) ===
-
+        // === 6. IF stage with proper stall and fill behavior ===
         if (!skipIF) {
 
-            if (stallIF) {
-                // Stalled by data hazard or D-cache miss: hold IF, don't touch
-                // PC or I-cache
-                // Stalled by data hazard or D-cache miss: hold IF, don't touch
-                // PC or I-cache
+            // If we must stall IF due to hazard or D‑cache miss, hold instruction
+            if (stallIF || prev.idInst.status == BUBBLE || prev.idInst.status == IDLE) {
                 pipelineInfo.ifInst = prev.ifInst;
-                pipelineInfo.ifInst.status = NORMAL;
-
-            } else if (iMissCyclesLeft > 0) {
-
-                // In the middle of an I-cache miss: keep the same instruction
-                // in IF
-                pipelineInfo.ifInst = nop(BUBBLE);
-                pipelineInfo.ifInst.PC = PC; // Preserve PC!
+            }
+            // If there’s an ongoing I‑cache miss, hold PC and IF
+            else if (iMissCyclesLeft > 0) {
+                pipelineInfo.ifInst = prev.ifInst;
                 iMissCyclesLeft--;
-
-            } else {
-                // New fetch opportunity: access I-cache
+            }
+            // Otherwise, fetch a new instruction
+            else {
                 bool hit = iCache->access(PC, CACHE_READ);
-                uint64_t fetchPC = PC; // Save PC before incrementing
+                uint64_t fetchPC = PC;
 
                 if (hit) {
-                    PC += 4; // Increment PC first
-                    pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
+                    // Advance PC only when ID can accept new instruction
+                    PC += 4;
+                    pipelineInfo.ifInst = simulator->simIF(fetchPC);
                     pipelineInfo.ifInst.status = NORMAL;
                 } else {
-                    pipelineInfo.ifInst = nop(IDLE);
-                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    // I‑cache miss — stall IF until miss completes
+                    pipelineInfo.ifInst = prev.ifInst;
                     iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
                 }
 
+                // If this is a branch instruction, mark speculative
                 if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
                     pipelineInfo.ifInst.status == NORMAL) {
                     pipelineInfo.ifInst.status = SPECULATIVE;
                 }
             }
-        } else {
 
-            // Branch squashed the IF stage this cycle
+        } else {
             pipelineInfo.ifInst = nop(SQUASHED);
         }
 
