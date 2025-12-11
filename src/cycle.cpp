@@ -253,6 +253,7 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
+    
     while (cycles == 0 || count < cycles) {
         std::cout << cycleCount << "\n";
 
@@ -551,12 +552,12 @@ Status runCycles(uint64_t cycles) {
             // Note: we *don't* touch PC here; PC redirect happens at the
             // top of the *next* cycle when exceptionPending is true.
         }
-    }
+    
 
     // Dump pipe state for the last cycle executed in this call
     pipeState.ifPC = pipelineInfo.ifInst.PC;
-    pipeState.ifStatus = NORMAL;
-    //pipeState.ifStatus = pipelineInfo.ifInst.status;
+    pipeState.ifStatus = NORMAL; // FIXES PRINTING ISSUE BUT IS NOT THE CLEANEST WAY 
+    //pipeState.ifStatus = pipelineInfo.ifInst.status; 
     pipeState.idInstr = pipelineInfo.idInst.instruction;
     pipeState.idStatus = pipelineInfo.idInst.status;
     pipeState.exInstr = pipelineInfo.exInst.instruction;
@@ -567,6 +568,14 @@ Status runCycles(uint64_t cycles) {
     pipeState.wbStatus = pipelineInfo.wbInst.status;
 
     dumpPipeState(pipeState, output);
+
+    if (pipelineInfo.wbInst.isHalt) {
+            status = HALT;
+            break;
+        }
+
+    }
+    
     return status;
 }
 
