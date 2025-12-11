@@ -416,9 +416,8 @@ Status runCycles(uint64_t cycles) {
         }
 
         // === 5. ID stage ===
-        if (stallID || pipelineInfo.ifInst.status == IDLE) {
+        if (stallID) {
             // hold previous instruction in ID
-            // or if I-cache miss, hold ID
             pipelineInfo.idInst = prev.idInst;
             pipelineInfo.idInst.status = NORMAL;
         } else {
@@ -479,6 +478,7 @@ Status runCycles(uint64_t cycles) {
                 // In the middle of an I-cache miss: keep the same instruction
                 // in IF
                 pipelineInfo.ifInst = nop(BUBBLE);
+                pipelineInfo.ifInst.PC = PC; // Preserve PC!
                 iMissCyclesLeft--;
 
             } else {
@@ -494,7 +494,9 @@ Status runCycles(uint64_t cycles) {
 
                 } else {
 
-                    pipelineInfo.ifInst = nop(BUBBLE);
+                    pipelineInfo.ifInst =
+                        nop(IDLE);               // First cycle of miss is IDLE
+                    pipelineInfo.ifInst.PC = PC; // Preserve PC!
                     iMissCyclesLeft =
                         static_cast<int>(iCache->config.missLatency);
                     // DO NOT advance PC; after the miss completes, this
