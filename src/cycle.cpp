@@ -16,8 +16,6 @@ static uint64_t cycleCount = 0;
 
 static uint64_t PC = 0; // start PC
 
-PipeState pipeState = {0};
-
 // stall & stats
 static int loadBranchStallCycles = 0; // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0; // total load-related stall cycles
@@ -253,6 +251,14 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
+    PipeState pipeState = {
+        0,          // cycle
+        IDLE, 0,    // IF
+        IDLE, 0,    // ID
+        IDLE, 0,    // EX
+        IDLE, 0,    // MEM
+        IDLE, 0     // WB
+    }
     
     while (cycles == 0 || count < cycles) {
         std::cout << cycleCount << "\n";
@@ -485,7 +491,7 @@ Status runCycles(uint64_t cycles) {
 
                 // In the middle of an I-cache miss: keep the same instruction
                 // in IF
-                pipelineInfo.ifInst = nop(BUBBLE);
+                pipelineInfo.ifInst = nop(NORMAL);
                 pipelineInfo.ifInst.PC = PC; // Preserve PC!
                 iMissCyclesLeft--;
 
@@ -499,7 +505,7 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
                 } else {
-                    pipelineInfo.ifInst = nop(IDLE);
+                    pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
                     iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
                 }
