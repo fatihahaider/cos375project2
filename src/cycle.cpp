@@ -17,12 +17,15 @@ static uint64_t cycleCount = 0;
 static uint64_t PC = 0; // start PC
 
 // stall & stats
-static int loadBranchStallCycles = 0; // remaining cycles of a load->branch stall
+static int loadBranchStallCycles =
+    0;                              // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0; // total load-related stall cycles
 
 // cache miss timing
-static int iMissCyclesLeft = 0; // remaining extra cycles for current I-cache miss
-static int dMissCyclesLeft = 0; // remaining extra cycles for current D-cache miss
+static int iMissCyclesLeft =
+    0; // remaining extra cycles for current I-cache miss
+static int dMissCyclesLeft =
+    0; // remaining extra cycles for current D-cache miss
 
 static const uint64_t EXCEPTION_HANDLER_ADDR = 0x8000;
 
@@ -43,10 +46,10 @@ Simulator::Instruction nop(StageStatus status) {
 
 static struct PipelineInfo {
     Simulator::Instruction ifInst = nop(IDLE);
-    Simulator::Instruction idInst = nop(IDLE);  
-    Simulator::Instruction exInst = nop(IDLE);  
-    Simulator::Instruction memInst = nop(IDLE); 
-    Simulator::Instruction wbInst = nop(IDLE);  
+    Simulator::Instruction idInst = nop(IDLE);
+    Simulator::Instruction exInst = nop(IDLE);
+    Simulator::Instruction memInst = nop(IDLE);
+    Simulator::Instruction wbInst = nop(IDLE);
 } pipelineInfo;
 
 // checks type of instruction
@@ -251,15 +254,8 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
-    PipeState pipeState = {
-        0,          // cycle
-        IDLE, 0,    // IF
-        IDLE, 0,    // ID
-        IDLE, 0,    // EX
-        IDLE, 0,    // MEM
-        IDLE, 0     // WB
-    }
-    
+    PipeState pipeState = {0};
+
     while (cycles == 0 || count < cycles) {
         std::cout << cycleCount << "\n";
 
@@ -377,7 +373,7 @@ Status runCycles(uint64_t cycles) {
                     // Hit: MEM completes this cycle
                     pipelineInfo.memInst = simulator->simMEM(memInput);
                     if (!pipelineInfo.memInst.isNop) {
-                    pipelineInfo.memInst.status = NORMAL;
+                        pipelineInfo.memInst.status = NORMAL;
                     }
 
                 } else {
@@ -385,7 +381,7 @@ Status runCycles(uint64_t cycles) {
                     // for config.missLatency extra cycles.
                     pipelineInfo.memInst = simulator->simMEM(memInput);
                     if (!pipelineInfo.memInst.isNop) {
-                    pipelineInfo.memInst.status = NORMAL;
+                        pipelineInfo.memInst.status = NORMAL;
                     }
                     dMissCyclesLeft =
                         static_cast<int>(dCache->config.missLatency);
@@ -394,7 +390,7 @@ Status runCycles(uint64_t cycles) {
                 // Non-memory instruction: just pass through MEM
                 pipelineInfo.memInst = simulator->simMEM(memInput);
                 if (!pipelineInfo.memInst.isNop) {
-                pipelineInfo.memInst.status = NORMAL;
+                    pipelineInfo.memInst.status = NORMAL;
                 }
             }
         }
@@ -423,7 +419,7 @@ Status runCycles(uint64_t cycles) {
                         pipelineInfo.wbInst);
             pipelineInfo.exInst = simulator->simEX(exInput);
             if (!pipelineInfo.exInst.isNop) {
-            pipelineInfo.exInst.status = NORMAL;
+                pipelineInfo.exInst.status = NORMAL;
             }
         }
 
@@ -435,7 +431,7 @@ Status runCycles(uint64_t cycles) {
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
             if (!pipelineInfo.idInst.isNop) {
-            pipelineInfo.idInst.status = NORMAL;
+                pipelineInfo.idInst.status = NORMAL;
             }
         }
 
@@ -502,12 +498,14 @@ Status runCycles(uint64_t cycles) {
 
                 if (hit) {
                     PC += 4; // Increment PC first
-                    pipelineInfo.ifInst = simulator->simIF(fetchPC); // Fetch from saved PC
+                    pipelineInfo.ifInst =
+                        simulator->simIF(fetchPC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
                 } else {
                     pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
-                    iMissCyclesLeft = static_cast<int>(iCache->config.missLatency);
+                    iMissCyclesLeft =
+                        static_cast<int>(iCache->config.missLatency);
                 }
 
                 if ((pipelineInfo.ifInst.instruction & 0x7F) == 0x63 &&
@@ -553,19 +551,19 @@ Status runCycles(uint64_t cycles) {
             // top of the *next* cycle when exceptionPending is true.
         }
 
-    // Dump pipe state for the last cycle executed in this call
-    pipeState.ifPC = pipelineInfo.ifInst.PC;
-    //pipeState.ifStatus = NORMAL; // FIXES PRINTING ISSUE BUT IS NOT THE CLEANEST WAY 
-    pipeState.ifStatus = pipelineInfo.ifInst.status; 
-    pipeState.idInstr = pipelineInfo.idInst.instruction;
-    pipeState.idStatus = pipelineInfo.idInst.status;
-    pipeState.exInstr = pipelineInfo.exInst.instruction;
-    pipeState.exStatus = pipelineInfo.exInst.status;
-    pipeState.memInstr = pipelineInfo.memInst.instruction;
-    pipeState.memStatus = pipelineInfo.memInst.status;
-    pipeState.wbInstr = pipelineInfo.wbInst.instruction;
-    pipeState.wbStatus = pipelineInfo.wbInst.status;
-
+        // Dump pipe state for the last cycle executed in this call
+        pipeState.ifPC = pipelineInfo.ifInst.PC;
+        // pipeState.ifStatus = NORMAL; // FIXES PRINTING ISSUE BUT IS NOT THE
+        // CLEANEST WAY
+        pipeState.ifStatus = pipelineInfo.ifInst.status;
+        pipeState.idInstr = pipelineInfo.idInst.instruction;
+        pipeState.idStatus = pipelineInfo.idInst.status;
+        pipeState.exInstr = pipelineInfo.exInst.instruction;
+        pipeState.exStatus = pipelineInfo.exInst.status;
+        pipeState.memInstr = pipelineInfo.memInst.instruction;
+        pipeState.memStatus = pipelineInfo.memInst.status;
+        pipeState.wbInstr = pipelineInfo.wbInst.instruction;
+        pipeState.wbStatus = pipelineInfo.wbInst.status;
     }
 
     dumpPipeState(pipeState, output);
