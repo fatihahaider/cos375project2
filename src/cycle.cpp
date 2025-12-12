@@ -332,7 +332,7 @@ Status runCycles(uint64_t cycles) {
             }
 
             // Load IF if not in a miss
-            if (iMissCyclesLeft == 0) {
+            if (iMissCyclesLeft == 0 && dMissCyclesLeft == 0) {
                 bool hit = iCache->access(PC, CACHE_READ);
                 pipelineInfo.ifInst =
                     simulator->simIF(PC);    // Fetch from saved PC
