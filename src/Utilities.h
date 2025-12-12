@@ -156,6 +156,3 @@ inline std::string getBaseFilename(const char *inputPath) {
         return path;
     }
 }
-
-static void printInstr(uint32_t curInst, StageStatus status,
-                       std::ostream &pipeState);
