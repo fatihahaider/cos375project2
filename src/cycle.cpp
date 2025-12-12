@@ -92,7 +92,9 @@ static bool hasArithBranchHazard(const Simulator::Instruction &producer,
     if (producer.rd == 0)
         return false;
 
-    return consumer.readsRs1 && (consumer.rs1 == producer.rd);
+    bool rs1Haz = consumer.readsRs1 && (consumer.rs1 == producer.rd);
+    bool rs2Haz = consumer.readsRs2 && (consumer.rs2 == producer.rd);
+    return rs1Haz || rs2Haz;
 }
 
 // load -> branch: load producer in EX, branch in ID
