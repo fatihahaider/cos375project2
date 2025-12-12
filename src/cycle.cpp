@@ -358,7 +358,7 @@ Status runCycles(uint64_t cycles) {
             }
 
             // If ID is a branch then set IF to speculative
-            if ((pipelineInfo.idInst.instruction & 0x7F) == 0x63 &&
+            if (isBranch(pipelineInfo.idInst) &&
                 pipelineInfo.idInst.status == NORMAL) {
                 pipelineInfo.ifInst.status = SPECULATIVE;
             }
@@ -398,10 +398,14 @@ Status runCycles(uint64_t cycles) {
         }
 
         // 3. EX
+        forwardToEX(pipelineInfo.exInst, pipelineInfo.exInst,
+                    pipelineInfo.memInst, pipelineInfo.wbInst);
         pipelineInfo.exInst = simulator->simEX(pipelineInfo.exInst);
 
         // 2. ID
         if (hazardStall == 0) {
+            forwardToID(pipelineInfo.idInst, pipelineInfo.exInst,
+                        pipelineInfo.memInst, pipelineInfo.wbInst);
             pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
         }
 
