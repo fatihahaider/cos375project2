@@ -488,22 +488,17 @@ static void forwardToID(Simulator::Instruction &idInst,
     if (idInst.readsRs1 && idInst.rs1 != 0) {
         // Priority: EX (ALU) -> MEM -> WB
         if (isArith(exInst) && exInst.rd == idInst.rs1) {
-            uint64_t oldVal = idInst.op1Val;
             idInst.op1Val = exInst.arithResult;
         } else if (memInst.writesRd && memInst.rd == idInst.rs1) {
             if (isLoad(memInst)) {
-                uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = memInst.memResult;
             } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = memInst.arithResult;
             }
         } else if (wbInst.writesRd && wbInst.rd == idInst.rs1) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = wbInst.memResult;
             } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = wbInst.arithResult;
             }
         }
@@ -512,30 +507,23 @@ static void forwardToID(Simulator::Instruction &idInst,
     // rs2
     if (idInst.readsRs2 && idInst.rs2 != 0) {
         if (isArith(exInst) && exInst.rd == idInst.rs2) {
-            uint64_t oldVal = idInst.op2Val;
             idInst.op2Val = exInst.arithResult;
         } else if (memInst.writesRd && memInst.rd == idInst.rs2) {
             if (isLoad(memInst)) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = memInst.memResult;
             } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = memInst.arithResult;
             }
         } else if (wbInst.writesRd && wbInst.rd == idInst.rs2) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.memResult;
             } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.arithResult;
             }
         } else if (wbInst.writesRd && wbInst.rd == idInst.rs2) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.memResult;
             } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.arithResult;
             }
         }

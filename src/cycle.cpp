@@ -137,10 +137,8 @@ static void forwardToEX(Simulator::Instruction &exInput,
         // MEM/WB -> EX
         if (memInst.writesRd && memInst.rd == exInput.rs1) {
             if (isLoad(memInst)) {
-                uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = memInst.memResult;
             } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = memInst.arithResult;
             }
         }
@@ -148,21 +146,15 @@ static void forwardToEX(Simulator::Instruction &exInput,
         // WB -> EX
         if (wbInst.writesRd && wbInst.rd == exInput.rs1) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = wbInst.memResult;
-                << regNames[exInput.rs1] << " with " << std::hex
-                << exInput.op1Val << " updating existing value of " << oldVal
-                << std::dec << "\n";
             }
         }
 
         // WB -> EX
         else if (wbInst.writesRd && wbInst.rd == exInput.rs1) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = wbInst.memResult;
             } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = wbInst.arithResult;
             }
         }
@@ -174,10 +166,8 @@ static void forwardToEX(Simulator::Instruction &exInput,
         // MEM/WB -> EX
         if (memInst.writesRd && memInst.rd == exInput.rs2) {
             if (isLoad(memInst)) {
-                uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = memInst.memResult;
             } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = memInst.arithResult;
             }
         }
@@ -185,10 +175,8 @@ static void forwardToEX(Simulator::Instruction &exInput,
         // WB -> EX
         else if (wbInst.writesRd && wbInst.rd == exInput.rs2) {
             if (isLoad(wbInst)) {
-                uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = wbInst.memResult;
             } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = wbInst.arithResult;
             }
         }
@@ -209,7 +197,6 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 
     // store uses rs2 as data
     if (memInst.rs2 == wbInst.rd) {
-        uint64_t oldVal = memInst.op2Val;
         memInst.op2Val = wbInst.memResult;
     }
 }
