@@ -220,25 +220,14 @@ static void forwardToID(Simulator::Instruction &idInst,
 
 // Helper Function to Forward into EX stage 3 Different Ways
 static void forwardToEX(Simulator::Instruction &exInput,
-                        const Simulator::Instruction &exInst,
                         const Simulator::Instruction &memInst,
                         const Simulator::Instruction &wbInst) {
 
     // register 1
     if (exInput.readsRs1 && exInput.rs1 != 0) {
 
-        // EX/MEM -> EX
-        if (exInst.writesRd && exInst.rd == exInput.rs1 && !isLoad(exInst)) {
-            uint64_t oldVal = exInput.op1Val;
-            exInput.op1Val = exInst.arithResult;
-            std::cout << "[Forward to EX] Arith to " << regNames[exInput.rs1]
-                      << " with " << std::hex << exInput.op1Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
-        }
-
         // MEM/WB -> EX
-        else if (memInst.writesRd && memInst.rd == exInput.rs1) {
+        if (memInst.writesRd && memInst.rd == exInput.rs1) {
             if (isLoad(memInst)) {
                 uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = memInst.memResult;
@@ -279,18 +268,8 @@ static void forwardToEX(Simulator::Instruction &exInput,
     // register 2
     if (exInput.readsRs2 && exInput.rs2 != 0) {
 
-        // EX/MEM -> EX
-        if (exInst.writesRd && exInst.rd == exInput.rs2 && !isLoad(exInst)) {
-            uint64_t oldVal = exInput.op2Val;
-            exInput.op2Val = exInst.arithResult;
-            std::cout << "[Forward to EX] Arith to " << regNames[exInput.rs2]
-                      << " with " << std::hex << exInput.op2Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
-        }
-
         // MEM/WB -> EX
-        else if (memInst.writesRd && memInst.rd == exInput.rs2) {
+        if (memInst.writesRd && memInst.rd == exInput.rs2) {
             if (isLoad(memInst)) {
                 uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = memInst.memResult;
@@ -492,8 +471,8 @@ Status runCycles(uint64_t cycles) {
         }
 
         // 3. EX
-        forwardToEX(pipelineInfo.exInst, pipelineInfo.exInst,
-                    pipelineInfo.memInst, pipelineInfo.wbInst);
+        forwardToEX(pipelineInfo.exInst, pipelineInfo.memInst,
+                    pipelineInfo.wbInst);
         pipelineInfo.exInst = simulator->simEX(pipelineInfo.exInst);
 
         // 2. ID
