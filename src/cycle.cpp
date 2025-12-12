@@ -346,6 +346,9 @@ Status runCycles(uint64_t cycles) {
                     iMissCyclesLeft =
                         static_cast<int>(iCache->config.missLatency);
                 }
+
+                // Advance PC
+                PC += 4;
             }
 
             // If ID is a branch then set IF to speculative
@@ -415,9 +418,6 @@ Status runCycles(uint64_t cycles) {
 
         if (dMissCyclesLeft > 0)
             dMissCyclesLeft--;
-
-        // Advance PC
-        PC += 4;
 
         // Dump pipe state for the last cycle executed in this call
         pipeState.ifPC = pipelineInfo.ifInst.PC;
