@@ -301,9 +301,14 @@ Status runCycles(uint64_t cycles) {
 
         // ----- ADVANCE PIPELINE ----- //
         if (dMissCyclesLeft > 0) {
-            // Data Cache Miss: hold MB, bubble WB
+            // Data Cache miss in flight: freeze younger stages and let WB drain
             pipelineInfo.memInst = prev.memInst;
             pipelineInfo.wbInst = nop(BUBBLE);
+
+            // Hold EX/ID/IF steady behind the miss so they don't issue
+            pipelineInfo.exInst = prev.exInst;
+            pipelineInfo.idInst = prev.idInst;
+            pipelineInfo.ifInst = prev.ifInst;
         } else {
             // Normal Pipeline: shift EX/MEM -> MEM/WB
             pipelineInfo.wbInst = prev.memInst;
@@ -330,12 +335,11 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.idInst = prev.ifInst;
                 }
 
-                // Load IF if not in a miss
-                if (iMissCyclesLeft == 0) {
+                // Load IF only when not stalled or already in an I-cache miss
+                if (hazardStall == 0 && iMissCyclesLeft == 0) {
                     bool hit = iCache->access(PC, CACHE_READ);
-                    pipelineInfo.ifInst =
-                        simulator->simIF(PC);    // Fetch from saved PC
-                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    pipelineInfo.ifInst = simulator->simIF(PC); // Fetch PC
+                    pipelineInfo.ifInst.PC = PC;                // Preserve PC
                     pipelineInfo.ifInst.status = NORMAL;
 
                     if (!hit) {
@@ -343,8 +347,11 @@ Status runCycles(uint64_t cycles) {
                             static_cast<int>(iCache->config.missLatency) + 1;
                     }
 
-                    // Advance PC
+                    // Advance PC only when we actually fetch
                     PC += 4;
+                } else {
+                    // Keep IF stable during hazards or ongoing miss
+                    pipelineInfo.ifInst = prev.ifInst;
                 }
             }
         }
