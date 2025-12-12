@@ -346,12 +346,6 @@ Status runCycles(uint64_t cycles) {
                     // Advance PC
                     PC += 4;
                 }
-
-                // If ID is a branch then set IF to speculative
-                if (isBranch(pipelineInfo.idInst) &&
-                    pipelineInfo.idInst.status == NORMAL) {
-                    pipelineInfo.ifInst.status = SPECULATIVE;
-                }
             }
         }
 
@@ -401,6 +395,7 @@ Status runCycles(uint64_t cycles) {
 
             if (isBranch(pipelineInfo.idInst)) {
                 PC = pipelineInfo.idInst.nextPC;
+                pipelineInfo.ifInst.status = SPECULATIVE;
             }
         }
 
