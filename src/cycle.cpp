@@ -320,7 +320,7 @@ Status runCycles(uint64_t cycles) {
             pipelineInfo.exInst = prev.idInst;
 
             // IF -> ID Advancement Logic
-            if (isBranch(prev.idInst) && prev.ifInst.PC != PC) {
+            if (prev.ifInst.PC != PC) {
                 // Branch misprediction: squash ID
                 pipelineInfo.idInst = nop(SQUASHED);
             } else if (iMissCyclesLeft > 0) {
@@ -399,7 +399,9 @@ Status runCycles(uint64_t cycles) {
                         pipelineInfo.memInst, pipelineInfo.wbInst);
             pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
 
-            PC = pipelineInfo.idInst.nextPC;
+            if (isBranch(pipelineInfo.idInst)) {
+                PC = pipelineInfo.idInst.nextPC;
+            }
         }
 
         // 1. IF (logic handled above)
