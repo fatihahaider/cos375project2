@@ -322,9 +322,15 @@ Status runCycles(uint64_t cycles) {
         } else {
             // Normal Pipeline: ID -> EX
             pipelineInfo.exInst = prev.idInst;
+            // PC += 4; // Moved to after fetch to ensure correct fetch address
+            // usage
 
             // IF -> ID Advancement Logic
-            if (prev.ifInst.PC != PC) {
+            // Check for branch misprediction (PC deviation)
+            // Only check if previous IF instruction was valid and flow is not
+            // sequential
+            if (prev.ifInst.status != IDLE && prev.ifInst.status != BUBBLE &&
+                prev.ifInst.status != SQUASHED && (prev.ifInst.PC + 4 != PC)) {
                 // Branch misprediction: squash ID
                 pipelineInfo.idInst = nop(SQUASHED);
             } else if (iMissCyclesLeft > 0) {
@@ -343,6 +349,7 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.ifInst =
                         simulator->simIF(PC); // Fetch from saved PC
                     pipelineInfo.ifInst.status = NORMAL;
+
                 } else {
                     pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
@@ -356,6 +363,9 @@ Status runCycles(uint64_t cycles) {
                 pipelineInfo.idInst.status == NORMAL) {
                 pipelineInfo.ifInst.status = SPECULATIVE;
             }
+
+            // Advance PC sequentially for next cycle
+            PC += 4;
         }
 
         // --- SIMULATE STAGES --- //
@@ -404,7 +414,13 @@ Status runCycles(uint64_t cycles) {
 
             printInstr(pipelineInfo.idInst.instruction,
                        pipelineInfo.idInst.status, std::cout);
-            PC = pipelineInfo.idInst.nextPC;
+
+            // Only update PC if branch taken (or jump) - overridden by ID stage
+            if (pipelineInfo.idInst.isLegal && !pipelineInfo.idInst.isNop) {
+                if (pipelineInfo.idInst.nextPC != pipelineInfo.idInst.PC + 4) {
+                    PC = pipelineInfo.idInst.nextPC;
+                }
+            }
             std::cout << "new PC: " << PC << "\n";
         }
 
