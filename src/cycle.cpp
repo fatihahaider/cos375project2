@@ -344,7 +344,7 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
                     iMissCyclesLeft =
-                        static_cast<int>(iCache->config.missLatency);
+                        static_cast<int>(iCache->config.missLatency) + 1;
                 }
 
                 // Advance PC
@@ -384,7 +384,7 @@ Status runCycles(uint64_t cycles) {
 
                 if (!hit) {
                     dMissCyclesLeft =
-                        static_cast<int>(dCache->config.missLatency);
+                        static_cast<int>(dCache->config.missLatency) + 1;
                 }
             } // Non-memory instruction: just pass through MEM
 
