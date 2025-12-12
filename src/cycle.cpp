@@ -308,50 +308,50 @@ Status runCycles(uint64_t cycles) {
             // Normal Pipeline: shift EX/MEM -> MEM/WB
             pipelineInfo.wbInst = prev.memInst;
             pipelineInfo.memInst = prev.exInst;
-        }
 
-        if (hazardStall > 0) {
-            // Waiting on data hazard. Freeze ID and below.
-            pipelineInfo.exInst = prev.exInst;
-            pipelineInfo.idInst = prev.idInst;
-            pipelineInfo.ifInst = prev.ifInst;
-        } else {
-            // Normal Pipeline: ID -> EX
-            pipelineInfo.exInst = prev.idInst;
-
-            // IF -> ID Advancement Logic
-            if (isBranch(prev.ifInst) && prev.ifInst.PC != PC) {
-                // Branch misprediction: squash ID
-                pipelineInfo.idInst = nop(SQUASHED);
-            } else if (iMissCyclesLeft > 0) {
-                // Instruction Cache Miss: hold IF, bubble ID
-                pipelineInfo.idInst = nop(BUBBLE);
+            if (hazardStall > 0) {
+                // Waiting on data hazard. Freeze ID and below.
+                pipelineInfo.exInst = prev.exInst;
+                pipelineInfo.idInst = prev.idInst;
+                pipelineInfo.ifInst = prev.ifInst;
             } else {
-                // Normal Pipeline: IF -> ID
-                pipelineInfo.idInst = prev.ifInst;
-            }
+                // Normal Pipeline: ID -> EX
+                pipelineInfo.exInst = prev.idInst;
 
-            // Load IF if not in a miss
-            if (iMissCyclesLeft == 0 && dMissCyclesLeft == 0) {
-                bool hit = iCache->access(PC, CACHE_READ);
-                pipelineInfo.ifInst =
-                    simulator->simIF(PC);    // Fetch from saved PC
-                pipelineInfo.ifInst.PC = PC; // Preserve PC
-                pipelineInfo.ifInst.status = NORMAL;
-
-                if (!hit) {
-                    iMissCyclesLeft =
-                        static_cast<int>(iCache->config.missLatency) + 1;
+                // IF -> ID Advancement Logic
+                if (isBranch(prev.ifInst) && prev.ifInst.PC != PC) {
+                    // Branch misprediction: squash ID
+                    pipelineInfo.idInst = nop(SQUASHED);
+                } else if (iMissCyclesLeft > 0) {
+                    // Instruction Cache Miss: hold IF, bubble ID
+                    pipelineInfo.idInst = nop(BUBBLE);
+                } else {
+                    // Normal Pipeline: IF -> ID
+                    pipelineInfo.idInst = prev.ifInst;
                 }
 
-                // Advance PC
-                PC += 4;
-            }
+                // Load IF if not in a miss
+                if (iMissCyclesLeft == 0) {
+                    bool hit = iCache->access(PC, CACHE_READ);
+                    pipelineInfo.ifInst =
+                        simulator->simIF(PC);    // Fetch from saved PC
+                    pipelineInfo.ifInst.PC = PC; // Preserve PC
+                    pipelineInfo.ifInst.status = NORMAL;
 
-            // If ID is a branch then set IF to speculative
-            if (isBranch(pipelineInfo.idInst) &&
-                pipelineInfo.idInst.status == NORMAL) {
-                pipelineInfo.ifInst.status = SPECULATIVE;
+                    if (!hit) {
+                        iMissCyclesLeft =
+                            static_cast<int>(iCache->config.missLatency) + 1;
+                    }
+
+                    // Advance PC
+                    PC += 4;
+                }
+
+                // If ID is a branch then set IF to speculative
+                if (isBranch(pipelineInfo.idInst) &&
+                    pipelineInfo.idInst.status == NORMAL) {
+                    pipelineInfo.ifInst.status = SPECULATIVE;
+                }
             }
         }
 
