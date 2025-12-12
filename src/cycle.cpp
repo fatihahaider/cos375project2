@@ -123,100 +123,8 @@ Status initSimulator(CacheConfig &iCacheConfig, CacheConfig &dCacheConfig,
     return SUCCESS;
 }
 
-// Forward values into ID stage operands from EX, MEM, WB
-static void forwardToID(Simulator::Instruction &idInst,
-                        const Simulator::Instruction &exInst,
-                        const Simulator::Instruction &memInst,
-                        const Simulator::Instruction &wbInst) {
-    // rs1
-    if (idInst.readsRs1 && idInst.rs1 != 0) {
-        // Priority: EX (ALU) -> MEM -> WB
-        if (isArith(exInst) && exInst.rd == idInst.rs1) {
-            uint64_t oldVal = idInst.op1Val;
-            idInst.op1Val = exInst.arithResult;
-            std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                      << " with " << std::hex << idInst.op1Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
-        } else if (memInst.writesRd && memInst.rd == idInst.rs1) {
-            if (isLoad(memInst)) {
-                uint64_t oldVal = idInst.op1Val;
-                idInst.op1Val = memInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op1Val;
-                idInst.op1Val = memInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            }
-        } else if (wbInst.writesRd && wbInst.rd == idInst.rs1) {
-            if (isLoad(wbInst)) {
-                uint64_t oldVal = idInst.op1Val;
-                idInst.op1Val = wbInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op1Val;
-                idInst.op1Val = wbInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            }
-        }
-    }
-
-    // rs2
-    if (idInst.readsRs2 && idInst.rs2 != 0) {
-        if (isArith(exInst) && exInst.rd == idInst.rs2) {
-            uint64_t oldVal = idInst.op2Val;
-            idInst.op2Val = exInst.arithResult;
-            std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                      << " with " << std::hex << idInst.op2Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
-        } else if (memInst.writesRd && memInst.rd == idInst.rs2) {
-            if (isLoad(memInst)) {
-                uint64_t oldVal = idInst.op2Val;
-                idInst.op2Val = memInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            } else if (memInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op2Val;
-                idInst.op2Val = memInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            }
-        } else if (wbInst.writesRd && wbInst.rd == idInst.rs2) {
-            if (isLoad(wbInst)) {
-                uint64_t oldVal = idInst.op2Val;
-                idInst.op2Val = wbInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            } else if (wbInst.doesArithLogic) {
-                uint64_t oldVal = idInst.op2Val;
-                idInst.op2Val = wbInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
-            }
-        }
-    }
-}
+// FORWARD TO ID is in simulator.cpp, since forwarding must take place after
+// parsing but before nextPCResolution and operand collection.
 
 // Helper Function to Forward into EX stage 3 Different Ways
 static void forwardToEX(Simulator::Instruction &exInput,
@@ -407,7 +315,7 @@ Status runCycles(uint64_t cycles) {
                 pipelineInfo.exInst = prev.idInst;
 
                 // IF -> ID Advancement Logic
-                if (isBranch(prev.idInst) && prev.ifInst.PC != PC) {
+                if (isBranch(prev.idInst) && prev.ifInst.PC != PC - 4) {
                     // Branch misprediction: squash ID
                     pipelineInfo.idInst = nop(SQUASHED);
                 } else if (iMissCyclesLeft > 0) {
@@ -477,13 +385,29 @@ Status runCycles(uint64_t cycles) {
 
         // 2. ID
         if (hazardStall == 0) {
-            forwardToID(pipelineInfo.idInst, pipelineInfo.exInst,
-                        pipelineInfo.memInst, pipelineInfo.wbInst);
-            pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
+            if (pipelineInfo.idInst.status == SPECULATIVE)
+                pipelineInfo.idInst.status =
+                    NORMAL; // spec instructions that made it this far are real
+                            // now
+
+            pipelineInfo.idInst =
+                simulator->simID(pipelineInfo.idInst, pipelineInfo.exInst,
+                                 pipelineInfo.memInst, pipelineInfo.wbInst);
 
             if (isBranch(pipelineInfo.idInst)) {
-                PC = pipelineInfo.idInst.nextPC;
+                // Debug message: idInst nextPC and ifInst PC, and current PC
+                std::cout << "[Branch Check] ID nextPC: " << std::hex
+                          << pipelineInfo.idInst.nextPC
+                          << ", IF PC: " << pipelineInfo.ifInst.PC
+                          << ", Current PC: " << (PC - 4) << std::dec << "\n";
+
                 pipelineInfo.ifInst.status = SPECULATIVE;
+
+                if (pipelineInfo.idInst.nextPC != pipelineInfo.ifInst.PC) {
+                    PC = pipelineInfo.idInst.nextPC;
+                } else {
+                    // Branch not taken; continue as normal
+                }
             }
         }
 

@@ -2,12 +2,12 @@
 
 #include <string>
 
-#include "Utilities.h"
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
+#include "Utilities.h"
 
 class Simulator {
-   private:
+  private:
     union REGS {
         RegisterInfo reg;
         uint64_t registers[32]{0};
@@ -16,31 +16,31 @@ class Simulator {
     // Registers
     union REGS regData;
     // memory component
-    MemoryStore* memory;
+    MemoryStore *memory;
 
     // Arch states and statistics
-    uint64_t din;  // Dynamic instruction number
+    uint64_t din; // Dynamic instruction number
 
-   public:
+  public:
     Simulator();
     ~Simulator();
 
     struct Instruction {
         // known by IF
         uint64_t PC = 0;
-        uint64_t instruction = 0;    // raw instruction encoding
+        uint64_t instruction = 0; // raw instruction encoding
 
         // known by ID
-        bool     isHalt = false;
-        bool     isLegal = false;
-        bool     isNop = false;
+        bool isHalt = false;
+        bool isLegal = false;
+        bool isNop = false;
 
-        bool     readsMem = false;
-        bool     writesMem = false;
-        bool     doesArithLogic = false;
-        bool     writesRd = false;
-        bool     readsRs1 = false;
-        bool     readsRs2 = false;
+        bool readsMem = false;
+        bool writesMem = false;
+        bool doesArithLogic = false;
+        bool writesRd = false;
+        bool readsRs1 = false;
+        bool readsRs2 = false;
 
         uint64_t opcode = 0;
         uint64_t funct3 = 0;
@@ -54,18 +54,17 @@ class Simulator {
         uint64_t op1Val = 0;
         uint64_t op2Val = 0;
 
-
         // known by EX
         uint64_t arithResult = 0;
         uint64_t memAddress = 0;
 
         // known by MEM
-        bool     memException = false;
+        bool memException = false;
         uint64_t memResult = 0;
         uint64_t valToWrite = 0;
 
         // known by WB
-        uint64_t instructionID = 0;  // din of the instruction
+        uint64_t instructionID = 0; // din of the instruction
 
         // Used for stage status tracking in cycle
         StageStatus status = NORMAL;
@@ -75,7 +74,7 @@ class Simulator {
     auto getDin() { return din; }
     auto getMemory() { return memory; }
 
-    void setMemory(MemoryStore* mem) { memory = mem; }
+    void setMemory(MemoryStore *mem) { memory = mem; }
 
     // Simulate by functionality (project 1)
     Instruction simFetch(uint64_t PC, MemoryStore *myMem);
@@ -92,11 +91,12 @@ class Simulator {
 
     // Simulate pipeline stages (project 2 TODO)
     Instruction simIF(uint64_t PC);
-    Instruction simID(Instruction inst);
+    Instruction simID(Instruction inst, const Instruction &exInst,
+                      const Instruction &memInst, const Instruction &wbInst);
     Instruction simEX(Instruction inst);
     Instruction simMEM(Instruction inst);
     Instruction simWB(Instruction inst);
 
     // Helper function to dump registers and memory
-    void dumpRegMem(const std::string& output_name);
+    void dumpRegMem(const std::string &output_name);
 };
