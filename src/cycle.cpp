@@ -403,6 +403,7 @@ Status runCycles(uint64_t cycles) {
             pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
 
             PC = pipelineInfo.idInst.nextPC;
+            std::cout << "new PC: " << PC << "\n";
         }
 
         // 1. IF (logic handled above)
