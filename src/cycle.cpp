@@ -261,12 +261,18 @@ Status runCycles(uint64_t cycles) {
         PipelineInfo prev = pipelineInfo;
 
         // If we raised an exception last cycle, redirect PC now
-        if (prev.memInst.memException || !prev.idInst.isLegal) {
-            PC = EXCEPTION_HANDLER_ADDR;
+        if (prev.memInst.memException || !prev.idInst.isLegal ||
+            prev.exInst.isHalt) {
 
-            // Start fresh in IF/ID; older instructions in EX/MEM/WB will drain
-            prev.ifInst = nop(BUBBLE);
-            prev.idInst = nop(BUBBLE);
+            PC = EXCEPTION_HANDLER_ADDR;
+            iMissCyclesLeft = 0;
+
+            if (!prev.exInst.isLegal) {
+                prev.exInst = nop(SQUASHED);
+            }
+
+            prev.ifInst = nop(SQUASHED);
+            prev.idInst = nop(SQUASHED);
         }
 
         // ----- HAZARD CHECKS ----- //
@@ -328,6 +334,8 @@ Status runCycles(uint64_t cycles) {
 
                 // Load IF if not in a miss
                 if (iMissCyclesLeft == 0) {
+                    std::cout << "[IF] Fetching instruction at PC: " << std::hex
+                              << PC << std::dec << "\n";
                     bool hit = iCache->access(PC, CACHE_READ);
                     pipelineInfo.ifInst =
                         simulator->simIF(PC);    // Fetch from saved PC
@@ -346,12 +354,6 @@ Status runCycles(uint64_t cycles) {
         }
 
         // --- SIMULATE STAGES --- //
-        // HALT check
-        if (pipelineInfo.wbInst.isHalt) {
-            status = HALT;
-            break;
-        }
-
         // 5. WB
         pipelineInfo.wbInst = simulator->simWB(pipelineInfo.wbInst);
 
@@ -434,6 +436,12 @@ Status runCycles(uint64_t cycles) {
         pipeState.memStatus = pipelineInfo.memInst.status;
         pipeState.wbInstr = pipelineInfo.wbInst.instruction;
         pipeState.wbStatus = pipelineInfo.wbInst.status;
+
+        // HALT check
+        if (pipelineInfo.wbInst.isHalt) {
+            status = HALT;
+            break;
+        }
     }
 
     dumpPipeState(pipeState, output);
