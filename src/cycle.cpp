@@ -341,7 +341,6 @@ Status runCycles(uint64_t cycles) {
                     pipelineInfo.ifInst.status = NORMAL;
 
                 } else {
-                    pipelineInfo.ifInst = nop(NORMAL);
                     pipelineInfo.ifInst.PC = PC; // Preserve PC
                     iMissCyclesLeft =
                         static_cast<int>(iCache->config.missLatency) + 1;
