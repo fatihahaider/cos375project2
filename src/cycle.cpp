@@ -85,7 +85,16 @@ static bool hasLoadUseHazard(const Simulator::Instruction &producer,
 // arithmetic -> branch: ALU producer in EX, branch in ID
 static bool hasArithBranchHazard(const Simulator::Instruction &producer,
                                  const Simulator::Instruction &consumer) {
-    return false;
+    if (!isArith(producer))
+        return false;
+    if (!isBranch(consumer))
+        return false;
+    if (producer.rd == 0)
+        return false;
+
+    bool rs1Haz = consumer.readsRs1 && (consumer.rs1 == producer.rd);
+    bool rs2Haz = consumer.readsRs2 && (consumer.rs2 == producer.rd);
+    return rs1Haz || rs2Haz;
 }
 
 // load -> branch: load producer in EX, branch in ID
@@ -467,15 +476,12 @@ Status runCycles(uint64_t cycles) {
         pipelineInfo.exInst = simulator->simEX(pipelineInfo.exInst);
 
         // 2. ID
-        // 2. ID
         if (hazardStall == 0) {
-            pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
             forwardToID(pipelineInfo.idInst, pipelineInfo.exInst,
                         pipelineInfo.memInst, pipelineInfo.wbInst);
+            pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
 
             if (isBranch(pipelineInfo.idInst)) {
-                pipelineInfo.idInst =
-                    simulator->simNextPCResolution(pipelineInfo.idInst);
                 PC = pipelineInfo.idInst.nextPC;
                 pipelineInfo.ifInst.status = SPECULATIVE;
             }
