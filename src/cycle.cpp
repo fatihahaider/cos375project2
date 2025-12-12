@@ -17,8 +17,6 @@ static uint64_t cycleCount = 0;
 static uint64_t PC = 0; // start PC
 
 // stall & stats
-static int loadBranchStallCycles =
-    0;                              // remaining cycles of a load->branch stall
 static uint64_t loadStallCount = 0; // total load-related stall cycles
 
 // cache miss timing
@@ -28,8 +26,6 @@ static int dMissCyclesLeft =
     0; // remaining extra cycles for current D-cache miss
 
 static const uint64_t EXCEPTION_HANDLER_ADDR = 0x8000;
-
-static bool exceptionPending = false; // "next cycle, start at handler"
 
 /**TODO: Implement pipeline simulation for the RISCV machine in this file.
  * A basic template is provided below that doesn't account for any hazards.
@@ -317,7 +313,6 @@ Status runCycles(uint64_t cycles) {
         // We set our PC += 4 last loop, but now we know for sure
         // if we were meant to branch or not. No matter what, idInst.nextPC is
         // the correct PC
-        PC = prev.idInst.nextPC;
 
         if (hazardStall > 0) {
             // Waiting on data hazard. Freeze ID and below.
@@ -342,7 +337,6 @@ Status runCycles(uint64_t cycles) {
 
             // Load IF if not in a miss
             if (iMissCyclesLeft == 0) {
-                PC += 4;
                 bool hit = iCache->access(PC, CACHE_READ);
 
                 if (hit) {
@@ -407,6 +401,8 @@ Status runCycles(uint64_t cycles) {
             forwardToID(pipelineInfo.idInst, pipelineInfo.exInst,
                         pipelineInfo.memInst, pipelineInfo.wbInst);
             pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
+
+            PC = pipelineInfo.idInst.nextPC;
         }
 
         // 1. IF (logic handled above)
