@@ -249,55 +249,6 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
 
 int hazardStall = 0;
 
-static void printInstr(uint32_t curInst, StageStatus status,
-                       std::ostream &pipeState) {
-    std::ostringstream sb;
-    if (curInst == 0xfeedfeed) {
-        sb << " HALT" << stageStatusStr.at(status);
-        pipeState << std::left << std::setw(25) << sb.str();
-        return;
-        // } else if (curInst == 0xdeefdeef) {
-        //     pipeState << std::left << std::setw(25) << " UNKNOWN ";
-        //     return;
-    } else if (curInst == 0x00000013) {
-        sb << " NOP" << stageStatusStr.at(status);
-        pipeState << std::left << std::setw(25) << sb.str();
-        return;
-    }
-
-    uint64_t opcode = extractBits(curInst, 6, 0);
-
-    switch (opcode) {
-    case OP_INT:
-    case OP_INTW:
-    case OP_INTIMM:
-    case OP_INTIMMW:
-    case OP_JALR:
-        handleIAndR(curInst, sb);
-        break;
-    case OP_LOAD:
-    case OP_STORE:
-        handleLAndS(curInst, sb);
-        break;
-    case OP_BRANCH:
-        handleBranch(curInst, sb);
-        break;
-    case OP_JAL:
-    case OP_LUI:
-    case OP_AUIPC:
-        handleSpecial(curInst, sb);
-        break;
-    default:
-        // Illegal instruction. Trigger an exception.
-        // Note: Since we catch illegal instructions here, the "handle"
-        // instructions don't need to check for illegal instructions.
-        // except for the case with a 0 opcode and illegal function.
-        sb << " ILLEGAL";
-    }
-    sb << stageStatusStr.at(status);
-    pipeState << std::left << std::setw(25) << sb.str();
-}
-
 Status runCycles(uint64_t cycles) {
     uint64_t count = 0;
     auto status = SUCCESS;
