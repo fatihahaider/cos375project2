@@ -311,7 +311,7 @@ Status runCycles(uint64_t cycles) {
 
             if (hazardStall > 0) {
                 // Waiting on data hazard. Freeze ID and below.
-                pipelineInfo.exInst = prev.exInst;
+                pipelineInfo.exInst = nop(BUBBLE);
                 pipelineInfo.idInst = prev.idInst;
                 pipelineInfo.ifInst = prev.ifInst;
             } else {
