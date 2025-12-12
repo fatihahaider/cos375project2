@@ -214,9 +214,6 @@ Simulator::Instruction Simulator::simNextPCResolution(Instruction inst) {
             }
             break;
         case FUNCT3_BLT:
-            std::cout << "blt check: op1Val[x" << inst.rs1
-                      << "]=" << inst.op1Val << ", op2Val[x" << inst.rs2
-                      << "]=" << inst.op2Val << "\n";
             if ((int64_t)inst.op1Val < (int64_t)inst.op2Val) {
                 inst.nextPC = branchTarget;
             }
@@ -459,12 +456,8 @@ Simulator::Instruction Simulator::simMemAccess(Instruction inst,
 Simulator::Instruction Simulator::simCommit(Instruction inst, REGS &regData) {
     if (inst.readsMem) {
         regData.registers[inst.rd] = inst.memResult;
-        std::cout << "WB: Write to x" << inst.rd << " value " << inst.memResult
-                  << "\n";
     } else {
         regData.registers[inst.rd] = inst.arithResult;
-        std::cout << "WB: Write to x" << inst.rd << " value "
-                  << inst.arithResult << "\n";
     }
     return inst;
 }
@@ -497,41 +490,21 @@ static void forwardToID(Simulator::Instruction &idInst,
         if (isArith(exInst) && exInst.rd == idInst.rs1) {
             uint64_t oldVal = idInst.op1Val;
             idInst.op1Val = exInst.arithResult;
-            std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                      << " with " << std::hex << idInst.op1Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
         } else if (memInst.writesRd && memInst.rd == idInst.rs1) {
             if (isLoad(memInst)) {
                 uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = memInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (memInst.doesArithLogic) {
                 uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = memInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             }
         } else if (wbInst.writesRd && wbInst.rd == idInst.rs1) {
             if (isLoad(wbInst)) {
                 uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = wbInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (wbInst.doesArithLogic) {
                 uint64_t oldVal = idInst.op1Val;
                 idInst.op1Val = wbInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs1]
-                          << " with " << std::hex << idInst.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             }
         }
     }
@@ -541,41 +514,29 @@ static void forwardToID(Simulator::Instruction &idInst,
         if (isArith(exInst) && exInst.rd == idInst.rs2) {
             uint64_t oldVal = idInst.op2Val;
             idInst.op2Val = exInst.arithResult;
-            std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                      << " with " << std::hex << idInst.op2Val
-                      << " updating existing value of " << oldVal << std::dec
-                      << "\n";
         } else if (memInst.writesRd && memInst.rd == idInst.rs2) {
             if (isLoad(memInst)) {
                 uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = memInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (memInst.doesArithLogic) {
                 uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = memInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             }
         } else if (wbInst.writesRd && wbInst.rd == idInst.rs2) {
             if (isLoad(wbInst)) {
                 uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.memResult;
-                std::cout << "[Forward to ID] Load to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (wbInst.doesArithLogic) {
                 uint64_t oldVal = idInst.op2Val;
                 idInst.op2Val = wbInst.arithResult;
-                std::cout << "[Forward to ID] Arith to " << regNames[idInst.rs2]
-                          << " with " << std::hex << idInst.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
+            }
+        } else if (wbInst.writesRd && wbInst.rd == idInst.rs2) {
+            if (isLoad(wbInst)) {
+                uint64_t oldVal = idInst.op2Val;
+                idInst.op2Val = wbInst.memResult;
+            } else if (wbInst.doesArithLogic) {
+                uint64_t oldVal = idInst.op2Val;
+                idInst.op2Val = wbInst.arithResult;
             }
         }
     }

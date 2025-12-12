@@ -139,17 +139,20 @@ static void forwardToEX(Simulator::Instruction &exInput,
             if (isLoad(memInst)) {
                 uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = memInst.memResult;
-                std::cout << "[Forward to EX] Load to " << regNames[exInput.rs1]
-                          << " with " << std::hex << exInput.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (memInst.doesArithLogic) {
                 uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = memInst.arithResult;
-                std::cout << "[Forward to EX] Arith to "
-                          << regNames[exInput.rs1] << " with " << std::hex
-                          << exInput.op1Val << " updating existing value of "
-                          << oldVal << std::dec << "\n";
+            }
+        }
+
+        // WB -> EX
+        if (wbInst.writesRd && wbInst.rd == exInput.rs1) {
+            if (isLoad(wbInst)) {
+                uint64_t oldVal = exInput.op1Val;
+                exInput.op1Val = wbInst.memResult;
+                << regNames[exInput.rs1] << " with " << std::hex
+                << exInput.op1Val << " updating existing value of " << oldVal
+                << std::dec << "\n";
             }
         }
 
@@ -158,17 +161,9 @@ static void forwardToEX(Simulator::Instruction &exInput,
             if (isLoad(wbInst)) {
                 uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = wbInst.memResult;
-                std::cout << "[Forward to EX] Load to " << regNames[exInput.rs1]
-                          << " with " << std::hex << exInput.op1Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (wbInst.doesArithLogic) {
                 uint64_t oldVal = exInput.op1Val;
                 exInput.op1Val = wbInst.arithResult;
-                std::cout << "[Forward to EX] Arith to "
-                          << regNames[exInput.rs1] << " with " << std::hex
-                          << exInput.op1Val << " updating existing value of "
-                          << oldVal << std::dec << "\n";
             }
         }
     }
@@ -181,17 +176,9 @@ static void forwardToEX(Simulator::Instruction &exInput,
             if (isLoad(memInst)) {
                 uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = memInst.memResult;
-                std::cout << "[Forward to EX] Load to " << regNames[exInput.rs2]
-                          << " with " << std::hex << exInput.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (memInst.doesArithLogic) {
                 uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = memInst.arithResult;
-                std::cout << "[Forward to EX] Arith to "
-                          << regNames[exInput.rs2] << " with " << std::hex
-                          << exInput.op2Val << " updating existing value of "
-                          << oldVal << std::dec << "\n";
             }
         }
 
@@ -200,17 +187,9 @@ static void forwardToEX(Simulator::Instruction &exInput,
             if (isLoad(wbInst)) {
                 uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = wbInst.memResult;
-                std::cout << "[Forward to EX] Load to " << regNames[exInput.rs2]
-                          << " with " << std::hex << exInput.op2Val
-                          << " updating existing value of " << oldVal
-                          << std::dec << "\n";
             } else if (wbInst.doesArithLogic) {
                 uint64_t oldVal = exInput.op2Val;
                 exInput.op2Val = wbInst.arithResult;
-                std::cout << "[Forward to EX] Arith to "
-                          << regNames[exInput.rs2] << " with " << std::hex
-                          << exInput.op2Val << " updating existing value of "
-                          << oldVal << std::dec << "\n";
             }
         }
     }
@@ -232,10 +211,6 @@ static void forwardLoadToStore(Simulator::Instruction &memInst,
     if (memInst.rs2 == wbInst.rd) {
         uint64_t oldVal = memInst.op2Val;
         memInst.op2Val = wbInst.memResult;
-        std::cout << "[Forward to MEM] Load to " << regNames[memInst.rs2]
-                  << " with " << std::hex << memInst.op2Val
-                  << " updating existing value of " << oldVal << std::dec
-                  << "\n";
     }
 }
 
@@ -251,8 +226,6 @@ Status runCycles(uint64_t cycles) {
     PipeState pipeState = {0};
 
     while (cycles == 0 || count < cycles) {
-        std::cout << cycleCount << "\n";
-
         pipeState.cycle = cycleCount;
         count++;
         cycleCount++;
@@ -334,8 +307,6 @@ Status runCycles(uint64_t cycles) {
 
                 // Load IF if not in a miss
                 if (iMissCyclesLeft == 0) {
-                    std::cout << "[IF] Fetching instruction at PC: " << std::hex
-                              << PC << std::dec << "\n";
                     bool hit = iCache->access(PC, CACHE_READ);
                     pipelineInfo.ifInst =
                         simulator->simIF(PC);    // Fetch from saved PC
@@ -397,11 +368,6 @@ Status runCycles(uint64_t cycles) {
                                  pipelineInfo.memInst, pipelineInfo.wbInst);
 
             if (isBranch(pipelineInfo.idInst)) {
-                // Debug message: idInst nextPC and ifInst PC, and current PC
-                std::cout << "[Branch Check] ID nextPC: " << std::hex
-                          << pipelineInfo.idInst.nextPC
-                          << ", IF PC: " << pipelineInfo.ifInst.PC
-                          << ", Current PC: " << (PC - 4) << std::dec << "\n";
 
                 pipelineInfo.ifInst.status = SPECULATIVE;
 
