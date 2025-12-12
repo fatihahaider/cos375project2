@@ -432,6 +432,9 @@ Status runCycles(uint64_t cycles) {
             // Bubble ID while IF is waiting for mem
             pipelineInfo.idInst = nop(BUBBLE);
             // Cycles decreased elsewhere
+        } else if (prev.ifInst.status == BUBBLE) {
+            // Bubble up
+            pipelineInfo.idInst = nop(BUBBLE);
         } else {
             pipelineInfo.idInst = simulator->simID(prev.ifInst);
             if (!pipelineInfo.idInst.isNop) {
