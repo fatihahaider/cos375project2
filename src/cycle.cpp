@@ -310,10 +310,6 @@ Status runCycles(uint64_t cycles) {
             pipelineInfo.memInst = prev.exInst;
         }
 
-        // We set our PC += 4 last loop, but now we know for sure
-        // if we were meant to branch or not. No matter what, idInst.nextPC is
-        // the correct PC
-
         if (hazardStall > 0) {
             // Waiting on data hazard. Freeze ID and below.
             pipelineInfo.exInst = nop(BUBBLE);
@@ -322,15 +318,9 @@ Status runCycles(uint64_t cycles) {
         } else {
             // Normal Pipeline: ID -> EX
             pipelineInfo.exInst = prev.idInst;
-            // PC += 4; // Moved to after fetch to ensure correct fetch address
-            // usage
 
             // IF -> ID Advancement Logic
-            // Check for branch misprediction (PC deviation)
-            // Only check if previous IF instruction was valid and flow is not
-            // sequential
-            if (prev.ifInst.status != IDLE && prev.ifInst.status != BUBBLE &&
-                prev.ifInst.status != SQUASHED && (prev.ifInst.PC + 4 != PC)) {
+            if (prev.ifInst.PC != PC) {
                 // Branch misprediction: squash ID
                 pipelineInfo.idInst = nop(SQUASHED);
             } else if (iMissCyclesLeft > 0) {
@@ -363,9 +353,6 @@ Status runCycles(uint64_t cycles) {
                 pipelineInfo.idInst.status == NORMAL) {
                 pipelineInfo.ifInst.status = SPECULATIVE;
             }
-
-            // Advance PC sequentially for next cycle
-            PC += 4;
         }
 
         // --- SIMULATE STAGES --- //
@@ -412,16 +399,7 @@ Status runCycles(uint64_t cycles) {
                         pipelineInfo.memInst, pipelineInfo.wbInst);
             pipelineInfo.idInst = simulator->simID(pipelineInfo.idInst);
 
-            printInstr(pipelineInfo.idInst.instruction,
-                       pipelineInfo.idInst.status, std::cout);
-
-            // Only update PC if branch taken (or jump) - overridden by ID stage
-            if (pipelineInfo.idInst.isLegal && !pipelineInfo.idInst.isNop) {
-                if (pipelineInfo.idInst.nextPC != pipelineInfo.idInst.PC + 4) {
-                    PC = pipelineInfo.idInst.nextPC;
-                }
-            }
-            std::cout << "new PC: " << PC << "\n";
+            PC = pipelineInfo.idInst.nextPC;
         }
 
         // 1. IF (logic handled above)
@@ -435,6 +413,9 @@ Status runCycles(uint64_t cycles) {
 
         if (dMissCyclesLeft > 0)
             dMissCyclesLeft--;
+
+        // Advance PC
+        PC += 4;
 
         // Dump pipe state for the last cycle executed in this call
         pipeState.ifPC = pipelineInfo.ifInst.PC;
