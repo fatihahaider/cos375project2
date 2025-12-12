@@ -319,7 +319,7 @@ Status runCycles(uint64_t cycles) {
                 pipelineInfo.exInst = prev.idInst;
 
                 // IF -> ID Advancement Logic
-                if (isBranch(prev.ifInst) && prev.ifInst.PC != PC) {
+                if (isBranch(prev.idInst) && prev.ifInst.PC != PC) {
                     // Branch misprediction: squash ID
                     pipelineInfo.idInst = nop(SQUASHED);
                 } else if (iMissCyclesLeft > 0) {
