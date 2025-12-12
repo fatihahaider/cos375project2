@@ -92,9 +92,7 @@ static bool hasArithBranchHazard(const Simulator::Instruction &producer,
     if (producer.rd == 0)
         return false;
 
-    // We will handle Arith->Branch by forwarding + recalculating nextPC in ID.
-    // So we do NOT need to stall.
-    return false;
+    return consumer.readsRs1 && (consumer.rs1 == producer.rd);
 }
 
 // load -> branch: load producer in EX, branch in ID
