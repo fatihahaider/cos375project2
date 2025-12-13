@@ -36,7 +36,7 @@
 - Refer to the syllabus generative AI tools policy: the policy for use of AI assistants parallels that for human collaboration. Remember that you cannot directly generate code that you submit.
 - Write "N/A" if you did not use generative AI for any help during this project.
 
-- [describe how you used generate AI or N/A]
+- we used chatGPT for conceptual clarification on concepts about the simulator and some debugging reasoning; no generated code was used in the final submission.
 
 ## Acknowledgement of Original Work
 
@@ -48,6 +48,11 @@
 >
 > > This programming assignment represents my own work in accordance with University regulations and the course syllabus. /s/ Ada Lovelace
 
+This programming assignment represents my own work in accordance with University regulations and the course syllabus.
 - /s/ Ryan Salik
+
+This programming assignment represents my own work in accordance with University regulations and the course syllabus.
 - /s/ Fatiha Haider
+
+This programming assignment represents my own work in accordance with University regulations and the course syllabus.
 - /s/ Misael Rosero
